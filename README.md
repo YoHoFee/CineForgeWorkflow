@@ -43,7 +43,12 @@
 SKILL.md                         Skill 主入口
 AGENTS.md                        仓库协作规则
 agents/openai.yaml               Codex 界面元数据
-references/                      状态、报告和资产模板契约
+references/                      状态、需求路由、视频提示词交接、片段链、报告和资产模板契约
+                               intake-and-routing.md：需求详细程度与动态路由
+                               video-prompt-handoff.md：第三方视频提示词交接契约
+                               video-segment-chain.md：超长视频片段链契约
+references/test-protocol.md     模拟全流程测试契约
+                               固定模式：REAL-CANVAS-BLIND-PREPROD-V1
 scripts/workflow-state.mjs       状态初始化与校验脚本
 ```
 
