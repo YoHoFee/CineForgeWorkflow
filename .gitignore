@@ -1,0 +1,24 @@
+# 依赖和生成的构建产物
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+
+# 本地运行时和编辑器文件
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 项目工作流状态属于具体视频项目，不属于本 Skill 仓库
+.short-drama/
+
+# 日志和临时文件
+*.log
+*.tmp
+*.bak

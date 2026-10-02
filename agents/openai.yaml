@@ -1,0 +1,6 @@
+interface:
+  display_name: "影铸工作流"
+  short_description: "编排 Drama Skills 与 Infinite Canvas 的短视频生产流程"
+  default_prompt: "使用 $short-video-workflow，将短视频项目按已确认阶段推进。"
+policy:
+  allow_implicit_invocation: true
