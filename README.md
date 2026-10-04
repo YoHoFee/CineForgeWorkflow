@@ -24,10 +24,10 @@
 
 | 名称 | 用途 | 依赖级别 |
 | --- | --- | --- |
-| `$infinite-canvas-bridge` | 画布绑定、参考图连线、图片/视频生成、状态恢复和素材回捞 | 使用 Infinite Canvas 时必需 |
-| Infinite Canvas MCP | 提供 Canvas 状态、节点、生成、状态查询和导出工具 | 使用 Canvas 生产时必需 |
-| Canvas Agent | 本地 Canvas 执行代理，默认地址为 `http://127.0.0.1:17371` | 使用本地 Canvas 时必需 |
-| Infinite Canvas Web | 本地画布前端，默认地址为 `http://localhost:3000/` | 使用本地 Canvas 时必需 |
+| `infinite-canvas:open-canvas` | 冷启动探测无效时启动/复用普通 Canvas Agent 并打开在线或项目指定画布 | 短视频工作流必需 |
+| `infinite-canvas:canvas` | 读取 Canvas、创建节点、连接参考图、生成和状态查询 | 短视频工作流必需 |
+| `$infinite-canvas-bridge` | 可选的 Infinite Canvas 协同实现层；未加载时由插件工具直接执行 | 非必需别名 |
+| Infinite Canvas Web | 在线或项目指定的画布前端 | 短视频工作流必需 |
 
 ### 本地运行时
 
@@ -45,6 +45,7 @@ AGENTS.md                        仓库协作规则
 agents/openai.yaml               Codex 界面元数据
 references/                      状态、需求路由、视频提示词交接、片段链、报告和资产模板契约
                                intake-and-routing.md：需求详细程度与动态路由
+                               unified-contract.md：跨 Skill 的统一接口和停止条件
                                video-prompt-handoff.md：第三方视频提示词交接契约
                                video-segment-chain.md：超长视频片段链契约
 references/test-protocol.md     模拟全流程测试契约
@@ -59,6 +60,18 @@ Skill 当前仍以 `$short-video-workflow` 的名称被发现和调用；仓库�
 
 ```powershell
 node scripts/workflow-state.mjs init <project-root>
+# 先完成 Canvas 冷启动，再用 record-canvas 写入 projectId、routePath、clientId、lastCheckedAt
+node scripts/workflow-state.mjs record-canvas <project-root> `
+  --project-id=<projectId> --client-id=<clientId> `
+  --route-path=/canvas/<projectId> --title="项目简称｜任务主题｜制作阶段"
+# 可选：把实时 canvas_get_state 原始 JSON 规范化写入 nodes/connections/referenceBindings
+node scripts/workflow-state.mjs record-canvas-snapshot <project-root> `
+  --path=.short-drama/raw-canvas-state.json
+# 主 Agent 必须将盲跑交付快照与重新查询的实时快照逐项对比
+node scripts/workflow-state.mjs audit-canvas-snapshot <project-root> `
+  --expected=<runner-output-relative-json> `
+  --actual=.short-drama/live-canvas-state.json
+# 再校验
 node scripts/workflow-state.mjs validate <project-root>
 ```
 

@@ -1,330 +1,128 @@
 ---
 name: short-video-workflow
-description: 编排经过创作者确认的短视频、短剧、动画、游戏历程视频和 AIGC 视频项目，协调现有 Drama Skills 与 Infinite Canvas bridge。当任务跨越规划、剧本、角色资产、分镜、提示词、媒体生产、回捞或交付阶段时使用。
+description: 编排短视频、短剧、漫剧、动画和 AIGC 视频项目；自动连接 Infinite Canvas，协调 Drama Skills，管理资产目标、批次、状态、参考绑定和生产闸门。
 ---
 
 # 影铸工作流
 
-这是一个用户级流程编排 Skill。它负责协调现有 Drama Skills 和
-`$infinite-canvas-bridge`，不替代它们的职责，也不重复它们的写作规则。该 Skill
-可以跨项目复用；具体项目文件只保存项目事实和工作流状态。
+影铸只负责跨阶段编排、Canvas 交接、状态和生产闸门，不代替 Drama Skills 写故事、
+剧本、视觉设定、图片提示词、分镜、视频提示词或剪辑。创作事实仍以项目的五份
+creator-first Markdown 为准；Canvas 是可视化、绑定和生产基础设施，不是第五套事实源。
 
-默认运行模式是“先需求摄取、按缺口路由、一次性补齐、图片自动生产、视频确认后
-生产”：先判断本轮需求的详细程度，读取项目事实和可复用资产，只询问阻塞条件，
-再把所有缺失阶段一次性编排到可生产状态。只有用户明确限定“先做剧情”“先做角色”
-等阶段性任务时，才停在指定阶段。进入生产时，展开该批次制作包、自动生成缺失的
-静态图片并在视频前请求一次明确确认。不得要求创作者确认纯图片阶段。除非创作者
-明确要求，不得插入草图、三视图、关键帧或逐场确认闸门。
+## 冷启动
 
-## 命令优先执行
+短视频项目启动即自动连接 Infinite Canvas，不等待用户再次要求；`stage_only` 也不跳过
+这一步。严格按以下顺序执行：
 
-使用直接命令、MCP 工具和服务/API 调用作为执行工作流的主要方式。只有在现有工具或
-命令无法可靠完成某项操作，或用户明确要求手动接管时，才使用浏览器或桌面鼠标操作。
+1. 读取项目 `AGENTS.md`、`README.md`、`short-drama.json`（如有）和
+   `.short-drama/workflow-state.json`（如有）。
+2. 确保 `canvas_get_state` 与 `infinite-canvas:open-canvas` 可用。`open-canvas` 是启动流程
+   Skill，不是一个缺失的 MCP 函数；工具未出现在初始列表时，立即用 `tool_search` 搜索
+   `canvas_get_state open-canvas`，加载状态工具并遵循启动 Skill，再继续。
+3. 先调用 `canvas_get_state` 探测当前连接。
+4. 若没有 `hasCanvas=true`、`projectId` 和共享 `clientId`，调用
+   `infinite-canvas:open-canvas` 的启动流程。在线冷启动应复用普通 Canvas Agent；没有运行实例时启动
+   `npx -y @basketikun/canvas-agent@latest`（不要启动 `... mcp` 代替网页 Agent），
+   等待 `Local URL` 与 `Connect token`，打开带 `#agentUrl`/`#agentToken` 的 Canvas 页面，
+   然后再次调用 `canvas_get_state`。已有可匹配页面或 Agent 时必须复用，不得启动第二实例。
+5. 只有复核再次返回完整 `hasCanvas/projectId/clientId` 才算连接成功；锁定这组
+   `projectId/clientId`，所有 UI 和 MCP 写入都必须落到对应 `/canvas/<projectId>` 页面。
+   不得使用 `mode=new`、随机 Canvas 标签或另一套状态掩盖映射问题。
 
-优先级顺序为：
+页面存在、MCP 工具已加载、Agent 进程存在或聊天中说过“已连接”都不是连接证据。完成
+上述启动/复核前，不得向用户报告“画布不可用”；复核仍失败时才报告具体的
+`no_canvas_tab`、`agent_unavailable`、`frontend_unreachable`、`route_mismatch`、
+`shared_client_missing` 或 `state_stale`，并停止依赖 Canvas 的动作。在线 Canvas 不要求
+本地项目目录；只有项目明确选择本地前端时才检查本地前端并切换其工作空间。
 
-1. 专用 MCP 工具和结构化服务调用，例如 Canvas 状态、节点、生成、状态、导出和
-   恢复工具。
-2. 终端命令或项目本地脚本，用于检查、验收、状态更新和其他确定性操作。
-3. 只有前两级无法完成所需操作时，才使用浏览器或桌面 UI。
+新建或恢复默认画布时，第一项写入必须是保存
+`项目简称｜任务主题｜制作阶段`；重命名后重新查询状态。默认标题未改成功前不得创建节点。
 
-使用 UI 操作前，先确认直接路径为何不可用，并简要说明降级原因。专用工具存在时，
-不得模拟点击；不得要求用户复制 JSON 或 token；不得仅因为 UI 更熟悉就使用 UI。
-完成手动操作后，必须回到直接状态查询和命令，进行验收和恢复。
+## 执行顺序
 
-## 范围与职责
+1. 记录本轮用户事实和执行范围；默认 `end_to_end`，只有用户明确限定阶段才用
+   `stage_only`。
+2. 按缺口调用唯一 owner；已有且匹配的内容标记 `reuse`，不重复创作。
+3. 依次补齐故事、剧本、视觉设定、图片提示词、分镜、视频提示词；阶段性请求只做
+   指定阶段及必要前置。
+4. 为每个需要的角色、场景、关键帧和必要道具明确 `reuse`、`generate`、`variant`
+   或 `blocked`。缺少真实参考时完成可完成的文档，但保持视频交接阻塞，不得静默跳过
+   或替用户选择文生视频。
+5. 静态图片缺失时，先建立独立图片批次并按当前图片确认闸门执行；图片真实验收通过后，
+   再建立独立的视频批次、参考绑定和视频报告。
+6. 实时读取 Canvas，核对节点、媒体证据、语义角色、连线端点和当前批次 config，
+   通过后才写 `ready_for_confirmation`。
 
-- 使用 `$short-drama` 进行项目路由和初始化。
-- 使用 `$short-drama-write` 编写 `剧本.md`。
-- 使用 `$short-drama-assets` 编写 `视觉设定.md`。
-- 使用 `$short-drama-image-prompts` 编写 `图片提示词.md`。
-- 使用 `$short-drama-storyboard` 编写 `分镜.md` 和冻结关键帧。
-- 使用 `$short-drama-video-prompts` 编写 `视频提示词.md`。
-- 使用 `$short-drama-produce` 执行已确认的生产任务。
-- 使用 `$short-drama-edit` 进行装配和交付。
-- 只有用户请求审查，或某个闸门要求检查时，才使用 `$short-drama-review`。
-- 所有 Infinite Canvas 执行、状态轮询和媒体回捞都使用
-  `$infinite-canvas-bridge`。
+## Owner 路由
 
-不得创建第五或第六套平行创作事实。五份 Drama Markdown 文档仍然是创作决策的
-权威来源。本 Skill 只负责工作流状态、批次记录、跨阶段引用和交接状态。
-`$short-drama-video-prompts` 是外部第三方 Skill，本仓库不修改其内容；视频提示词
-交接按 [video-prompt-handoff.md](references/video-prompt-handoff.md) 在本编排层
-校验。
+- 项目初始化、跨阶段规划、故事开发：`$short-drama` / `$short-drama-develop`
+- 剧本：`$short-drama-write`
+- 角色、造型、场景、道具、连续性：`$short-drama-assets`
+- 图片提示词：`$short-drama-image-prompts`
+- 分镜、冻结关键帧：`$short-drama-storyboard`
+- 视频运动提示词：`$short-drama-video-prompts`
+- 已确认媒体生产：`$short-drama-produce`
+- 剪辑交付：`$short-drama-edit`
+- 用户点名审查或闸门发现问题：`$short-drama-review`
 
-## 冷启动流程
+第三方 Skill 只拥有自己的正文和输出；影铸只校验统一交接，不复制或改写其创作规则。
+Canvas 协同优先使用 `$infinite-canvas-bridge`；该 Skill 不可用时，直接使用
+`infinite-canvas@infinite-canvas-local` 的 `open-canvas` 与 `canvas` 工具，协议不变。
 
-每次启动新 Agent 或开始项目新一轮任务时：
+## 不可违反的契约
 
-1. 读取项目 `AGENTS.md` 和 `README.md`。
-2. 如果存在，读取 `short-drama.json`。
-3. 如果存在，读取 `.short-drama/workflow-state.json`。如果缺失，只能按照
-   [workflow-state.md](references/workflow-state.md) 创建状态骨架；不得从聊天历史
-   或画布外观推断确认状态。
-4. 只读取本次请求需要的当前阶段文档。
-5. 只有当前请求明确要求 Canvas，或当前路由已经进入需要 Canvas 的图片、视频、
-   画布绑定或媒体回捞阶段时，才通过 `$infinite-canvas-bridge` 查询 Infinite Canvas
-   状态。纯剧本、资产设定、分镜和提示词编写不因未连接 Canvas 而停止或报警。
-6. 需要 Canvas 时，任何画布操作前运行 bridge 单实例预检：复用
-   `http://localhost:3000/` 和 `http://127.0.0.1:17371`，在这两个地址上核对
-   标准供应商通道；发现重复运行实例或 Origin 不一致时停止。
-7. 打开或修改 Canvas 前，读取当前 Codex UI 主题，并将 Infinite Canvas 设置为
-   相同主题。Codex 浅色对应 Canvas 浅色，Codex 深色对应 Canvas 深色。重连、
-   切换项目和启动新 Agent 后都要重新检查。如果无法判断 Codex 主题，必须在
-   画布操作前停止，不得猜测。
-8. 新建 Canvas 项目时，必须先命名并保存，再添加节点。使用
-   `项目简称｜任务主题｜制作阶段` 格式；不得留下 `画布 1` 或 `无限画布 2`
-   等默认名称。恢复时，只有名称仍为默认占位名且项目上下文明确，才可以重命名；
-   用户已经设置的描述性名称必须保留。
+- 新流程的角色参考只有一张 `character-design-sheet`，同一张图包含展示、正/侧/背、
+  细节和面部区域；不得创建或连接 `character-sketch`、`character-turnaround`。
+- `IMG-*` 是提示词条目，不是图片。参考图只能来自真实项目文件、真实附件或实时 Canvas
+  图片节点；需要上传用户图片时使用 `canvas_create_attachment_nodes`。不得创建只有标题、
+  尺寸、`assetId` 或 metadata 的空图片节点。
+- 图片接入按固定优先级执行：先用 `canvas_get_state` 查找可复用的真实图片节点；
+  本轮用户上传的图片用 `canvas_create_attachment_nodes`；缺少真实节点但图片资产已获
+  确认时，交给图片生产 owner 或已注册的媒体适配层建立正常图片结果，再回到 Canvas
+  复核。不要在对话中展开或手工拼接大段 Base64，也不要把本地路径、文件名或尺寸
+  metadata 当作媒体。若当前工具链没有可验证的真实媒体入口，立即保持 `blocked`。
+- 项目内已有图片或控制面预置图片只有在真实内容已经进入 Canvas、或已有可读取存储
+  句柄时才可复用；创建或复用后必须立即用 `canvas_get_state` 核对 `status=success`、
+  图片 MIME、非空媒体证据和自然尺寸。控制面预置的图片节点必须表现为正常生产资产，
+  不能要求运行 Agent 自己猜测或重建隐藏的测试替代物。
+- 复用已有 Canvas 图片前，必须逐节点比较项目资产的 `actualSize`/`naturalWidth`/
+  `naturalHeight` 与实时节点的自然尺寸和媒体内容内嵌尺寸；任一不一致都按
+  `resolution_invalid` 或 `blocked` 处理，重新写入真实媒体或建立新节点，不能只改
+  `metadata`、`assetId` 或尺寸字段伪装通过。
+- 阶段性视频提示词可以保留结构化的 `PLAN-*` 槽位并停在 `draft`；槽位必须保留顺序、
+  用途、控制和不得控制语义，进入确认前必须替换为真实 `REF-*` 和可读取媒体。
+- 视频参考按语义连接：`character-design-sheet` 管身份/造型，
+  `scene-design-sheet` 管地理，`keyframe` 管起始构图，`ending-keyframe` 只在真实存在时
+  管结束状态。连接方向必须是 `image -> video-config`。
+- 同一真实文件在同一镜头承担多个语义时，必须建立多个独立真实图片节点，并在槽位记录
+  `canvasNodeId`；一个图片节点不能承担多个 role。
+- `参考音频` 独立于图片槽位，必须保留音频顺序、角色和语义；真实文件与目标模型能力
+  均未核对前不得进入视频确认，不能静默丢弃或改写成图片节点。
+- 每个当前视频批次只能有一个 `MOTION-*` 和一个当前 config。复用画布可以保留历史
+  config，但不得把历史节点混入当前批次；config 必须是 `type=config`，且包含
+  `modality=video`、`generationMode=video`、当前 `motionId`、`autoRun=false`，有参考时
+  `referencePolicy=all-connected`，明确的非角色文生视频才用 `none`。
+- `videoReferenceIds` 必须与实时参考绑定来源节点集合完全一致；当前批次的每条真实
+  图片入边都必须登记，反向、猜端点、漏边和多挂参考都失败。
+- 未获得当前媒体批次的明确确认前，不得调用 `canvas_generate_*`、
+  `canvas_run_generation` 或外部媒体 adapter。图片、视频、配音和音乐分别确认；
+  “继续”“提示词已接受”或上一次确认都不算本次授权。
+- `$short-drama-produce` 只执行已确认的当前 modality、报告指纹和 targets；提交后用
+  `generation_get_status` 恢复，不重复提交已有任务。
 
-如果项目路径、当前 Canvas 项目和工作流状态无法对应，必须停止并报告具体不一致。
-不得创建替代画布，也不得迁移或重新生成内容来掩盖不一致。
+## 状态与恢复
 
-## Canvas 按需连接策略
+使用 `references/workflow-state.md` 和 `scripts/workflow-state.mjs`。实时 Canvas 连接后先
+用 `record-canvas` 登记 `projectId`、`routePath`、`clientId`、标题和检查时间；需要保存
+节点时使用 `record-canvas-snapshot`，不要手写节点 ID、媒体证据或连线端点。
 
-每轮请求先判断 Canvas 使用级别，并写入工作流状态的 `canvas.requirement`：
+新状态的 Canvas `requirement` 固定为 `required`；没有实时连接不得继续短视频流程，也
+不得把本地 Markdown 或 fixture 当作 Canvas 交接。状态脚本通过只代表保存的快照内部一致，
+确认前仍必须由主 Agent 重新查询实时 Canvas。
 
-| 使用级别 | 典型请求 | 行为 |
-| --- | --- | --- |
-| `not_required` | 写剧情、角色设定、场景设定、分镜或视频提示词 | 不查询 Canvas，不显示未连接警告 |
-| `optional` | 先整理制作包，稍后再绑定 Canvas 或生成媒体 | 优先完成本地项目文件；Canvas 未连接不阻塞，不重复提醒 |
-| `required` | 用户要求操作画布、绑定参考图、Canvas 生图/生视频、回捞 Canvas 媒体 | 到达对应步骤时才检查连接；连接失败只在该步骤报告一次具体阻断 |
+失败、重连或新 Agent 从项目文件和状态恢复。遇到项目映射、真实媒体、参考语义、连线、
+提示词交接或确认缺口，保持 `blocked`/失败并报告具体缺口，不创建替代画布。
 
-不要在冷启动时无条件执行 `canvas_get_state`。不要因为上一次请求没有 Canvas，
-就在下一次请求重复报告同一问题。只有当本轮路由首次进入 `required` 阶段，或用户
-明确要求重新连接/查看 Canvas 时，才重新检查。
-
-Canvas 不可用时：
-
-- `not_required`：静默跳过。
-- `optional`：继续本地创作，并记录 `canvas.status=unavailable`，不把它当作失败。
-- `required`：停止依赖 Canvas 的动作，说明具体缺口；不得伪造项目、节点或链接。
-
-本地创作完成后，用户之后要求连接 Canvas 时，从项目文件和状态恢复，不要求用户
-重复已经完成的创作内容。
-
-## 需求摄取与动态路由
-
-每轮短视频请求先执行 [需求摄取与动态路由契约](references/intake-and-routing.md)，
-再决定是否进入创作或生产：
-
-1. **读取与盘点**：读取本轮用户请求、项目规则、相关创作文档、工作流状态、已保存
-   资产和当前 Canvas；按 `explicit`、`project`、`reusable`、`default`、`missing`
-   标记交付目标、时长、故事、角色、场景、镜头、提示词和生产参数。
-2. **识别详细程度**：归类为 `brief`、`partial`、`detailed`、`production_ready`
-   或 `continuation`。分类只用于选流程，不是要求用户填写的表单。
-3. **确认阻塞条件**：优先确认缺失时长；只有会改变方案且无法从项目事实判断的
-   画幅、平台、交付形态或核心意图才继续询问。不要为了补齐所有字段而一次性追问。
-4. **确定执行范围**：默认使用 `end_to_end`，把请求补齐到可生产状态；只有用户明确
-   指定“先做剧情/角色/分镜”等阶段，才使用 `stage_only` 并在该阶段停下。
-5. **形成路由**：用户明确的新想法覆盖旧决定；其余优先复用项目事实和匹配资产。
-   对每个真正缺口指定责任 Skill，已完成或复用的阶段标记为跳过。
-6. **按路由执行**：`end_to_end` 调用缺口对应的全部 Drama Skills，直至完整前期制作
-   包和生产准备完成；`stage_only` 只执行指定阶段及必要前置。缺故事才进入
-   `$short-drama` 的开发路径，缺剧本才调用 `$short-drama-write`，缺角色/场景才
-   调用 `$short-drama-assets`，依次类推。
-7. **恢复评估**：用户补充信息或某个阶段完成后，重新盘点 `intake`，合并已知信息，
-   清除已解决问题，并从新的第一项未完成路由继续。
-
-入口示例：用户说“帮我制作一个武侠风短视频”，先确认时长；得到时长后，按当前
-项目是否已有故事、角色、场景和素材，一次性补齐缺失阶段。用户提供剧本或项目已有
-角色时，直接带入后续流程，不重复创作，除非用户明确要求新方案。用户说“我们先做个
-剧情吧”时，只执行剧情阶段及其必要前置，不自动补角色、分镜或生产。
-
-## 必需工作流
-
-默认每轮执行完整缺口闭环；若 `executionScope=stage_only`，才只执行用户指定的
-阶段。阶段内部遵循以下顺序：
-
-1. **需求摄取与资产检索**：先记录用户事实，再检索匹配资产和项目文档。
-2. **缺口创作或修订**：调用完整路由指定的 Drama Skills，创作内容回写各自权威文档；
-   阶段模式只回写当前阶段及必要前置。
-3. **批次制作包**：只有本轮要进入媒体生产时，才生成覆盖当前目标的合并设计报告，
-   写明复用、待生成资产、参考绑定、生产参数、任务数和成本边界。
-4. **图片生产与验收**：仅生成当前批次缺失或无效的图片；逐张检查尺寸和比例。
-5. **视频确认闸门**：所有本批次所需静态图片验收通过后，才请求绑定报告指纹的一次
-   明确确认，并且确认只授权列出的目标视频。
-6. **生产、回捞与登记**：确认后执行目标媒体生产，回捞已接受媒体并登记相对路径和
-   源节点 ID。阶段模式在指定阶段结束后停止，不创建后续阶段的无关生产任务。
-
-## 第三方视频提示词交接
-
-视频提示词不是“有几个参考图节点”就算完成。进入视频确认前，必须在当前分镜和
-冻结关键帧完成后调用外部 `$short-drama-video-prompts`，并按
-[video-prompt-handoff.md](references/video-prompt-handoff.md) 校验其输出。
-
-每个 `MOTION-...` 镜头必须逐张说明参考图的顺序、项目相对路径、中文名称、用途、
-控制范围和不得控制范围。角色设定图、场景图和首帧图不能只以节点 ID 或标题代替
-语义说明。校验失败时，带错误清单回交第三方 Skill 修订；不得由本编排 Skill
-自行另写替代提示词，也不得继续进入视频确认。
-
-`videoPromptHandoff.status=validated` 是视频确认的前置条件。若交接状态为
-`blocked`、存在待补参考图、目标模型能力不匹配或提示词正文缺少起点到终点的可执行
-状态链，必须停在交接阶段。
-
-## 超长视频片段链
-
-如果本镜或连续段的目标时长超过目标模型单次生成上限，必须按
-[video-segment-chain.md](references/video-segment-chain.md) 建立片段链。H3 默认上限
-为 15 秒，Seedance 默认上限为 30 秒；以项目能力档案中更严格的限制为准。
-
-片段 1 使用原始首帧，片段 2 及之后必须等待上一片段生成完成并提取真实尾帧，再把
-该尾帧作为下一片段的首帧参考。不能用提示词、计划关键帧或文字描述代替真实尾帧，
-也不能并行提交同一连续链中的后续片段。所有片段完成后才交给 `$short-drama-edit`
-拼接，并按片段索引检查总时长和连续性。
-
-旧版 `pending_confirmation` 草图和三视图闸门只为兼容旧状态文件保留，新任务不得使用。
-
-## 资产设定图标准
-
-- **角色设定图**：使用下游参考流程要求的画幅。16:9 视频使用 16:9 设定图；
-  其他情况选择能容纳全部面板、且文字可读、细节不拥挤的比例。设定图包含大型
-  展示视图、正面/侧面/背面三视图、细节标注和面部特写区，用于替代分开的草图
-  和三视图资产。
-- **场景设定图**：使用下游参考流程要求的画幅；面板较多时可以使用更大的可读
-  画布。图中不得出现人物，并且必须将总览、平面关系、替代角度和细节充分分隔，
-  使空间关系清晰可读。
-- 模板只能使用通用虚线轮廓作为占位。每个视图都必须有明确的短标签和不同几何
-  特征：`FRONT / 正面`、`PROFILE / 侧面`、`BACK / 背面`；侧面轮廓必须明显
-  包含鼻子、嘴唇、下巴、耳朵和颈部方向。面部细节区至少包含一个正面视图和
-  一个侧面视图。无法可靠区分的虚线轮廓视为无效。
-  详见 [asset-sheet-templates.md](references/asset-sheet-templates.md)。
-
-## 生成默认值与资产复用
-
-- 图片生成默认使用已配置的 `gpt-image-2.5` 通道/模型、高质量和明确的 2K 目标，
-  除非项目要求其他档位。必须同时使用 Canvas 图片尺寸和画幅比例，例如
-  `2k + 16:9 -> 2048x1152`，不得只依赖提示词中的比例描述。
-- 自定义供应商脚本属于实际生产请求链路，必须原样传递 `params.size`，例如
-  `2048x1152`；不得硬编码 `resolution: "1k"` 等回退值，也不得省略比例或尺寸
-  字段。生产前检查所选模型脚本，或使用系统 OpenAI 兼容路径；即使 Canvas 节点
-  显示 `2k · 16:9`，脚本丢失请求尺寸也视为无效。
-- 供应商专用别名，如 `resolution: "1k"`，不能替代精确 Canvas 尺寸。如果供应商
-  还要求档位字段，应从目标尺寸推导档位，并同时发送精确尺寸/比例字段。
-- 请求尺寸不等于实际尺寸。每张图片成功后，都要将 `naturalWidth` 和
-  `naturalHeight` 与目标比较并验收画幅。2K 16:9 目标至少返回 `2048x1152`，
-  每条边允许的误差不超过 1 像素；`1024x1024` 回退结果无效，不得保存为生产
-  参考图。
-- 如果供应商忽略请求尺寸，先在同一配置上使用明确的 Canvas 尺寸/比例字段重试。
-  仍低于目标时，在可用的情况下使用同一目标链路上已有的、经过验证的超分路径。
-  如果没有经过验证的超分路径，将图片标记为 `resolution_invalid`，阻断后续关键帧
-  和视频生成，并报告供应商限制。不得静默登记或使用低分辨率结果。
-- 视频分辨率遵循所选视频模型支持的上限，不继承图片设定图的 4K 设置。
-- 每个新图片任务前，都要按稳定资产 ID、标题和角色检索已保存资产。成功且匹配
-  的资产应复用并绑定为参考图，不得创建重复资产。
-
-## Canvas 组织与重试
-
-- 角色和场景生产分别放在独立的原生 Canvas 组中，组名使用资产名称，例如
-  `折月女剑修｜角色设定图` 和 `雪山山脊｜场景设定图`。提示词文本、唯一生成配置、
-  参考图和输出都保留在对应组内。
-- 每个目标只创建一个配置节点。如果供应商任务提交前生成失败，修改同一配置并
-  重新运行。如果已有供应商任务 ID，必须先查询或回收该任务，再考虑重试。普通
-  生成失败不得创建替代节点。
-- 起始关键帧必须使用视频要求的精确画幅。16:9 视频的关键帧配置必须为 `16:9`，
-  且验收输出也必须是 16:9，之后才能连接到视频配置。
-- 使用确定性的 Canvas 布局：左侧上下排列角色组和场景组；右侧放关键帧、剧本/
-  分镜注释和视频组。输出靠近配置节点，参考箭头从左向右，文本节点周围预留足够
-  空间。
-- 将剧本、分镜、视觉设定摘要、提示词说明和生产约束放入 Canvas 文本注释节点。
-  这些节点只作注释；项目 Markdown 文档仍是权威来源。
-
-## 状态与批次记录
-
-将运行状态放在创作 Markdown 之外：
-
-```text
-.short-drama/workflow-state.json
-.short-drama/production-batches/<batch-id>.json
-.short-drama/manifests/<batch-id>.json
-```
-
-使用本用户级 Skill 附带的辅助脚本初始化或校验状态。`project` 参数始终是当前
-项目根目录：
-
-```text
-node "$CODEX_HOME/skills/short-video-workflow/scripts/workflow-state.mjs" init <project>
-node "$CODEX_HOME/skills/short-video-workflow/scripts/workflow-state.mjs" validate <project>
-node "$CODEX_HOME/skills/short-video-workflow/scripts/workflow-state.mjs" approve-sketch <project> --confirmation=USER_CONFIRMED_SKETCH
-```
-
-如果未设置 `CODEX_HOME`，使用用户的 Codex 主目录：Windows 为
-`%USERPROFILE%\.codex`，类 Unix 系统为 `$HOME/.codex`。
-
-只有用户明确确认当前角色草图后，才可以运行 `approve-sketch`。
-
-使用 [workflow-state.md](references/workflow-state.md) 中的 Schema 和状态转换规则。
-必须持久化：
-
-- 故事和视觉确认状态；
-- 是否提供了角色参考；
-- 视频提示词交接状态、来源文件、哈希和校验结果；
-- 超长视频的片段链状态、模型上限、片段时长、真实尾帧和前后片段关系；
-- 角色草图和三视图状态；
-- 关键帧状态；
-- 当前 Canvas 项目 ID；
-- 批次 ID 和目标节点 ID；
-- 完整的视频参考节点 ID 及语义角色；
-- 已提交任务 ID、状态和回捞后的输出路径。
-
-状态文件不是跳过图片生产的许可。`productionConfirmation.status=pending_video_only`
-明确表示允许图片生产，工作流必须继续，直到所有静态图片通过验收。当前用户确认
-只针对当前批次的视频生成。
-
-## 固定测试模式
-
-本 Skill 的功能验收统一使用 `REAL-CANVAS-BLIND-PREPROD-V1`，不得使用只写文档、
-只生成本地 fixture、只运行状态脚本或只做静态检查的替代流程。主 Agent 知道验收
-控制面；独立子 Agent 只接收真实生产形态的自然语言请求和分离的运行参数，按冻结
-Skill 盲跑到视频确认闸口。
-
-该模式要求真实 Infinite Canvas 上实际完成全部非生成交互，图片由控制面按正常
-成功结果预置或隔离拦截，视频、音频、配音和音乐不触发真实生产；测试结束前保留
-Canvas、浏览器标签和本地 Agent 连接。画布必须保持正常生产态，不得出现测试节点、
-测试标记或审计文字。只有主 Agent 独立审计并提供可点击的待确认制作包、状态快照、
-审计日志和真实 Canvas 链接后，才可报告通过。
-子 Agent 的 Canvas 快照和完成自报不是证据；主 Agent 必须重新查询真实 Canvas，
-逐项核对项目 ID、节点、连线和生产语义。实时画布为空或与交付清单不一致时必须
-报告失败。子 Agent 必须使用主 Agent 可重新读取的同一 Canvas 会话或明确共享的
-Canvas Agent 连接；隔离进程中的“画布”不算真实交互。
-
-## 功能完成后的模拟验收
-
-维护或修改本 Skill、reference、状态脚本或界面元数据后，必须按
-[test-protocol.md](references/test-protocol.md) 和
-[runner-input-template.md](references/runner-input-template.md) 冻结当前 Skill
-版本，并按 `REAL-CANVAS-BLIND-PREPROD-V1` 调用独立子 Agent 盲跑一次正常生产流程。
-主请求必须与真实用户的一句短
-需求同形；Skill 快照路径、跳过真实图片调用、图片按已验收处理和停在视频确认
-闸口等参数单独附加。子 Agent 只接收指定版本的生产规则和项目事实，不得知道这是
-验收；主 Agent 在运行时控制面预置或拦截图片生产，并把结果呈现为已经生成且通过
-验收的正常参考资产。流程必须运行到视频确认闸口前，不得提交视频任务或触发任何
-真实媒体生产。主 Agent 必须独立审计子 Agent 产物后才能汇报完成。
-完整通过必须在真实 Infinite Canvas 上执行所有非生成交互，并保留画布和 Agent
-连接。汇报时必须提供待确认制作包、最终状态快照、审计日志和真实画布的可点击
-链接；真实画布链接必须在状态核验后生成，local fixture 只能作为 degraded/failed
-诊断附件。
-
-测试画布的可见内容必须与正常的视频生产准备态一致。画布标题和节点中不得出现
-测试运行号、fixture、模拟图片、`TEST_ONLY`、`SIMULATED_IMAGES`、
-`VIDEO_GENERATION_NOT_SUBMITTED`、审计结论或其他测试说明。跳过图片生产时，只能
-保留具有角色设定图、场景设定图和起始关键帧语义的空参考槽位，并将它们按正常
-生产关系连接到视频配置；所有测试标记只能出现在画布外的测试报告、状态快照和日志。
-
-## 失败处理
-
-- **画布为空或错误**：核对 `projectId`、路由、客户端和工作区。刷新或重新连接
-  现有页面；不得通过创建新 Canvas 项目来修复。
-- **重复生成**：查询状态并恢复/回收现有任务。在确认现有任务明确失败且新批次已
-  获得确认前，不得提交等价重试。
-- **缺少参考图**：停止并列出缺少的角色清单。不得静默降级为单图视频请求。
-- **分辨率或比例无效**：在确认前停止批次。记录请求尺寸和实际尺寸，使受影响的
-  资产失效，并修复原配置节点或使用已验证的超分路径。不得让无效图片进入已保存
-  资产库或视频参考集合。
-- **风格漂移**：回到图片提示词和视觉设定负责人处修正；不得只在下游视频提示词
-  中修补风格。
-- **上下文丢失**：根据项目文件和状态重建，并报告恢复到的阶段。不得要求用户
-  重复已经记录的事实。
-
-每次项目回复都必须以绝对项目目录结尾。只有在已核实 Canvas 属于当前项目时，
-才附上 Canvas 入口。
+修改本 Skill、reference、状态脚本或界面元数据后，按
+`references/test-protocol.md` 的 `REAL-CANVAS-BLIND-PREPROD-V1` 执行真实 Canvas 盲跑；
+真实 Canvas 不可用只能报告 `degraded`/`failed`，不能用 fixture 冒充通过。
