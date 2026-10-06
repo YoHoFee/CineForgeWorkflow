@@ -149,7 +149,7 @@ Canvas 冷启动固定为：
 项目预检 -> 加载/发现 Infinite Canvas 工具 -> canvas_get_state 探测
 ->（探测无效时）infinite-canvas:open-canvas
 -> canvas_get_state 复核 -> 校验 projectId/clientId
-->（可观察时核对 route）-> 操作
+-> 锁定 origin ->（可观察时核对 route）-> 操作
 ```
 
 Infinite Canvas 是短视频工作流的默认基础设施，不需要用户在每个任务中重复要求。
@@ -168,9 +168,10 @@ Canvas 页面；已有匹配页面或 Agent 时不得启动第二实例。随后
 能观察浏览器 URL 时，必须核对它与实时 `projectId` 一致；只有观察到冲突才是
 `route_mismatch`。多个 Canvas 标签时不能依赖随机当前标签，也不能因为标签存在、插件
 MCP 进程存在、页面标题正常或聊天历史中的“已连接”而跳过探测和重试。
-一旦 `canvas_get_state` 返回完整连接，返回的 `projectId/clientId` 就锁定本轮唯一写入
-目标；不得再打开 `mode=new` 或在随机标签上重命名、建节点、连线。UI 操作必须在与实时
-项目路由一致的页面完成，并在每次重命名后重新查询实时状态；如果 UI 已显示生产标题而
+一旦 `canvas_get_state` 返回完整连接，返回的 `projectId/clientId` 与浏览器 origin 就锁定
+本轮唯一写入目标；不得再打开 `mode=new`、切换站点 origin 或在随机标签上重命名、建节点、
+连线。UI 操作必须在与实时项目路由和 origin 一致的页面完成，并在每次重命名后重新查询
+实时状态；如果 UI 已显示生产标题而
 MCP 只返回旧的默认标题，只要 projectId、clientId 和 route 仍一致即可继续使用 UI 标题；
 两个不同的非默认标题或身份/路由不一致时，才停止写入并归类为 `state_stale`、
 `route_mismatch` 或 `shared_client_missing`。
@@ -201,14 +202,15 @@ mediaAvailable =
 client ID、节点或连接数组的快照，并阻止用一个已连接项目的快照覆盖另一个项目。
 
 连接阻断必须归类为以下之一：`no_canvas_tab`、`agent_unavailable`、
-`frontend_unreachable`、`state_stale`、`route_mismatch`、`shared_client_missing`。
+`frontend_unreachable`、`state_stale`、`route_mismatch`、`shared_client_missing`、
+`canvas_origin_mismatch`。
 UI 已显示生产标题且身份/路由一致时，MCP 的默认标题读模型延迟不属于连接阻断；
 不得只报告“画布不可用”。
 
-默认模式是在线 Canvas。只有项目规则明确选择本地前端时，才核对
-`http://localhost:3000/`；`http://127.0.0.1:17371` 是普通 Canvas Agent 的本地连接
-地址，在线前端也可以使用它。在线模式不要求本机 `localhost:3000` 存在，本地模式不得
-静默切换到在线页面。`canvas_get_state` 失败时必须先完成启动/重连尝试，再报告具体
+默认模式沿用当前浏览器页面或项目状态中已锁定的 Canvas origin。只有没有任何锁定
+origin 的全新项目，才按项目规则选择在线或本地前端；锁定 `http://localhost:3000`
+后不得静默切换到 `https://canvas.best`，反之亦然。`http://127.0.0.1:17371` 是普通
+Canvas Agent 的本地连接地址，不是网页 origin。`canvas_get_state` 失败时必须先完成启动/重连尝试，再报告具体
 启动环节，不得把“没有打开标签”概括为项目画布损坏。`open-canvas` 不可发现时，按
 同一启动动作使用浏览器和终端完成，不得把工具缺失报告成连接失败。
 

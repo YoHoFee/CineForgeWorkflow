@@ -47,6 +47,9 @@ Canvas fixture 演练，而是在真实 Infinite Canvas 上执行所有非生成
    主 Agent 必须通过实时 `canvas_get_state` 或等价查询重新读取项目，并逐项对齐
    项目 ID、节点数量、节点 ID/类型/生产语义、连线数量和端点；空画布、项目 ID
    不符或关键节点/连线缺失都必须失败。
+   同时必须核对浏览器前端 origin 与项目状态中的 `canvas.origin`；锁定
+   `http://localhost:3000` 时不得使用 `https://canvas.best` 的页面或渠道存储，反之
+   亦然。origin 不一致必须记录 `canvas_origin_mismatch` 并失败。
 8. 子 Agent 必须使用主 Agent 可重新读取的同一真实 Canvas 会话或明确共享的
    Canvas Agent 连接；子 Agent 私有浏览器、私有 MCP 客户端或隔离进程中的节点，
    即使有完整快照，也不得视为真实交互。

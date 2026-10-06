@@ -17,6 +17,7 @@ const emptyState = {
         requirement: "required",
         status: "not_evaluated",
         lastCheckedAt: null,
+        origin: null,
         projectId: null,
         routePath: null,
         clientId: null,
@@ -109,6 +110,8 @@ if (command === "record-canvas") {
     }
     const projectId = getOption(args, "--project-id");
     const clientId = getOption(args, "--client-id");
+    const originArg = getOption(args, "--origin");
+    const origin = normalizeCanvasOrigin(originArg ?? state.canvas?.origin);
     const routePath = getOption(args, "--route-path") ?? (projectId ? `/canvas/${projectId}` : null);
     const title = getOption(args, "--title");
     const checkedAt = getOption(args, "--checked-at") ?? new Date().toISOString();
@@ -119,6 +122,10 @@ if (command === "record-canvas") {
         errors.push("--project-id 必须是非空 Canvas projectId");
     }
     if (!normalizedClientId) errors.push("--client-id 必须是非空共享 clientId");
+    if (!origin) errors.push("--origin 必须是没有路径、查询或片段的 http(s) origin");
+    if (state.canvas?.origin && origin && state.canvas.origin !== origin) {
+        errors.push(`Canvas origin 已锁定为 ${state.canvas.origin}，不能静默切换到 ${origin}`);
+    }
     if (!routePath || !/^\/canvas\/[^\s/?#]+$/u.test(routePath)) {
         errors.push("--route-path 必须匹配 /canvas/<projectId>");
     } else if (projectId && routePath !== `/canvas/${projectId}`) {
@@ -154,6 +161,7 @@ if (command === "record-canvas") {
         requirement: "required",
         status: "connected",
         lastCheckedAt: checkedAt,
+        origin,
         projectId,
         routePath,
         clientId: normalizedClientId,
@@ -1511,6 +1519,10 @@ function validateCanvasState(canvas, errors, schemaVersion = 4, preproductionSta
     if (canvas.lastCheckedAt !== null && typeof canvas.lastCheckedAt !== "string") {
         errors.push("canvas.lastCheckedAt 必须是 ISO 时间字符串或 null");
     }
+    if (canvas.origin !== null && canvas.origin !== undefined
+        && (typeof canvas.origin !== "string" || normalizeCanvasOrigin(canvas.origin) !== canvas.origin)) {
+        errors.push("canvas.origin 必须是规范化的 http(s) origin 或 null");
+    }
     if (canvas.projectId !== null && typeof canvas.projectId !== "string") {
         errors.push("canvas.projectId 必须是字符串或 null");
     }
@@ -1547,6 +1559,9 @@ function validateCanvasState(canvas, errors, schemaVersion = 4, preproductionSta
     }
     if (canvas.status === "connected" && !canvas.clientId) {
         errors.push("canvas.status=connected 时需要 clientId");
+    }
+    if (schemaVersion >= 4 && canvas.status === "connected" && !canvas.origin) {
+        errors.push("schemaVersion=4 的已连接 Canvas 必须记录 origin");
     }
     if (canvas.status === "connected" && !canvas.title) {
         errors.push("canvas.status=connected 时需要 title");
@@ -2420,6 +2435,24 @@ function isValidDateString(value) {
     return typeof value === "string"
         && Number.isFinite(Date.parse(value))
         && value.includes("T");
+}
+
+function normalizeCanvasOrigin(value) {
+    if (typeof value !== "string" || !value.trim()) return null;
+    try {
+        const url = new URL(value.trim());
+        if (!["http:", "https:"].includes(url.protocol)
+            || url.username
+            || url.password
+            || url.pathname !== "/"
+            || url.search
+            || url.hash) {
+            return null;
+        }
+        return url.origin;
+    } catch {
+        return null;
+    }
 }
 
 function isDefaultCanvasTitle(value) {

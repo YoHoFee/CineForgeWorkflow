@@ -14,6 +14,7 @@
 ```powershell
 node <skill-root>/scripts/workflow-state.mjs record-canvas <project-root> `
   --project-id=<projectId> --client-id=<clientId> `
+  --origin=<canvas-origin> `
   --route-path=/canvas/<projectId> --title="项目简称｜任务主题｜制作阶段"
 ```
 
@@ -65,6 +66,7 @@ config/`MOTION-*` 明确提供；不应让脚本凭节点顺序猜测。
     "requirement": "required",
     "status": "not_evaluated",
     "lastCheckedAt": null,
+    "origin": null,
     "projectId": null,
     "routePath": null,
     "clientId": null,
@@ -179,6 +181,9 @@ config/`MOTION-*` 明确提供；不应让脚本凭节点顺序猜测。
 - `canvas.status`：`not_evaluated`、`connected`、`unavailable`、`degraded`、`mismatch`
 - `canvas.lastCheckedAt`：最近一次实际检查 Canvas 的时间；未检查时为 `null`
 - `canvas.projectId`：最近一次通过实时查询确认的 Canvas 项目 ID
+- `canvas.origin`：最近一次实时核验的浏览器 origin，例如
+  `http://localhost:3000` 或 `https://canvas.best`。渠道和模型配置按 origin 隔离；
+  新 Agent 恢复时必须复用该 origin，不能由第三方启动 Skill 的默认地址覆盖。
 - `canvas.routePath`：最近一次实时核验或由实时 `projectId` 推导的项目路由，必须为
   `/canvas/<projectId>`；如果浏览器 URL 可观察，应优先记录实测路由
 - `canvas.clientId`：最近一次实时核验的共享 Canvas client/session 标识

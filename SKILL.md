@@ -16,18 +16,27 @@ creator-first Markdown 为准；Canvas 是可视化、绑定和生产基础设�
 
 1. 读取项目 `AGENTS.md`、`README.md`、`short-drama.json`（如有）和
    `.short-drama/workflow-state.json`（如有）。
-2. 确保 `canvas_get_state` 与 `infinite-canvas:open-canvas` 可用。`open-canvas` 是启动流程
+2. 读取并锁定 [Canvas Origin 锁定契约](references/canvas-origin-lock.md) 中的
+   `canvas.origin`。如果当前浏览器已有 Canvas 页面，先从可观察 URL 提取 origin；
+   不得让第三方 `open-canvas` 的默认在线地址覆盖已有 origin。确保
+   `canvas_get_state` 与 `infinite-canvas:open-canvas` 可用。`open-canvas` 是启动流程
    Skill，不是一个缺失的 MCP 函数；工具未出现在初始列表时，立即用 `tool_search` 搜索
    `canvas_get_state open-canvas`，加载状态工具并遵循启动 Skill，再继续。
 3. 先调用 `canvas_get_state` 探测当前连接。
 4. 若没有 `hasCanvas=true`、`projectId` 和共享 `clientId`，调用
-   `infinite-canvas:open-canvas` 的启动流程。在线冷启动应复用普通 Canvas Agent；没有运行实例时启动
+   `infinite-canvas:open-canvas` 的启动流程，但必须使用已锁定的 origin。在线冷启动应复用普通 Canvas Agent；没有运行实例时启动
    `npx -y @basketikun/canvas-agent@latest`（不要启动 `... mcp` 代替网页 Agent），
-   等待 `Local URL` 与 `Connect token`，打开带 `#agentUrl`/`#agentToken` 的 Canvas 页面，
-   然后再次调用 `canvas_get_state`。已有可匹配页面或 Agent 时必须复用，不得启动第二实例。
+   等待 `Local URL` 与 `Connect token`，在同一 origin 打开带
+   `#agentUrl`/`#agentToken` 的 Canvas 页面，然后再次调用 `canvas_get_state`。
+   已有可匹配页面或 Agent 时必须复用，不得启动第二实例，也不得从
+   `http://localhost:3000` 跳到 `https://canvas.best` 或反向跳转。
+   锁定本地 origin 时使用本地前端相对路由或本地启动流程，不得调用
+   `open-canvas` 的默认在线启动路径。
 5. 只有复核再次返回完整 `hasCanvas/projectId/clientId` 才算连接成功；锁定这组
-   `projectId/clientId`，所有 UI 和 MCP 写入都必须落到对应 `/canvas/<projectId>` 页面。
-   不得使用 `mode=new`、随机 Canvas 标签或另一套状态掩盖映射问题。
+   `projectId/clientId`，并将实时浏览器 origin 记录到 `canvas.origin`；所有 UI 和
+   MCP 写入都必须落到同一 origin 的 `/canvas/<projectId>` 页面。不得使用
+   `mode=new`、随机 Canvas 标签、另一 origin 或另一套状态掩盖映射问题。具体规则见
+   [canvas-origin-lock.md](references/canvas-origin-lock.md)。
 
 页面存在、MCP 工具已加载、Agent 进程存在或聊天中说过“已连接”都不是连接证据。完成
 上述启动/复核前，不得向用户报告“画布不可用”；复核仍失败时才报告具体的
@@ -113,7 +122,7 @@ Canvas 协同优先使用 `$infinite-canvas-bridge`；该 Skill 不可用时，�
 ## 状态与恢复
 
 使用 `references/workflow-state.md` 和 `scripts/workflow-state.mjs`。实时 Canvas 连接后先
-用 `record-canvas` 登记 `projectId`、`routePath`、`clientId`、标题和检查时间；需要保存
+用 `record-canvas` 登记 `origin`、`projectId`、`routePath`、`clientId`、标题和检查时间；需要保存
 节点时使用 `record-canvas-snapshot`，不要手写节点 ID、媒体证据或连线端点。
 
 新状态的 Canvas `requirement` 固定为 `required`；没有实时连接不得继续短视频流程，也

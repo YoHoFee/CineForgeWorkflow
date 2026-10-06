@@ -63,6 +63,7 @@ node scripts/workflow-state.mjs init <project-root>
 # 先完成 Canvas 冷启动，再用 record-canvas 写入 projectId、routePath、clientId、lastCheckedAt
 node scripts/workflow-state.mjs record-canvas <project-root> `
   --project-id=<projectId> --client-id=<clientId> `
+  --origin=<canvas-origin> `
   --route-path=/canvas/<projectId> --title="项目简称｜任务主题｜制作阶段"
 # 可选：把实时 canvas_get_state 原始 JSON 规范化写入 nodes/connections/referenceBindings
 node scripts/workflow-state.mjs record-canvas-snapshot <project-root> `
