@@ -1,0 +1,6 @@
+interface:
+  display_name: "影铸依赖安装"
+  short_description: "首次安装或缺失依赖时，检查并自动补齐影铸需要的 Skill 与插件"
+  default_prompt: "使用 $cineforge-dependencies 检查本机影铸依赖，自动安装缺失的 Skill 和插件，并引导我完成首次使用。"
+policy:
+  allow_implicit_invocation: true

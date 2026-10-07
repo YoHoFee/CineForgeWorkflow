@@ -40,9 +40,12 @@ node <loaded-skill-root>/scripts/update-skill.mjs --check
 
 ## 安装与恢复
 
-受管理范围为 `SKILL.md`、`agents/`、`references/`、`scripts/`，以及仓库存在的
+受管理范围为 `SKILL.md`、`agents/`、`references/`、`scripts/`、内附安装器
+`skills/cineforge-dependencies/`，以及仓库存在的
 `README.md`、`CHANGELOG.md`、`LICENSE`。同步会移除新版中已删除的受管理文件。
 其他顶层内容原样保留；不复制远端 `.git`、仓库级 `AGENTS.md`、项目状态或媒体。
+附带安装器随影铸更新；用户另行安装的独立 `cineforge-dependencies` 目录不会被此脚本
+覆盖。主工作流缺失恢复优先读取当前影铸内附版本，避免独立安装器的旧清单影响恢复。
 
 先在临时目录下载固定仓库并核对 Skill 身份、文件类型和完整文件指纹。更新采用同盘
 暂存目录、完整旧目录备份和目录切换；并发更新由安装目录旁的锁阻止。写入前复核

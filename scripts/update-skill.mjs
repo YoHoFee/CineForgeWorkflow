@@ -11,7 +11,7 @@ export const REPOSITORY = "https://github.com/YoHoFee/CineForgeWorkflow.git";
 export const BRANCH = "main";
 export const SKILL_NAME = "short-video-workflow";
 const RECEIPT = ".skill-install.json";
-const MANAGED = ["SKILL.md", "agents", "references", "scripts", "README.md", "CHANGELOG.md", "LICENSE"];
+const MANAGED = ["SKILL.md", "agents", "references", "scripts", "skills/cineforge-dependencies", "README.md", "CHANGELOG.md", "LICENSE"];
 const TEXT_EXTENSIONS = new Set([".md", ".mjs", ".js", ".json", ".yaml", ".yml", ".txt", ".py", ".ps1", ".sh"]);
 
 function managed(relativePath) {
@@ -34,7 +34,8 @@ function fileMap(root, onlyManaged = true) {
     function walk(directory, prefix = "") {
         for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
             const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-            if (onlyManaged && !managed(relativePath)) continue;
+            if (onlyManaged && !managed(relativePath)
+                && !(entry.isDirectory() && MANAGED.some((item) => item.startsWith(`${relativePath}/`)))) continue;
             const absolutePath = path.join(directory, entry.name);
             if (entry.isSymbolicLink()) throw new Error(`目录含链接，停止覆盖：${relativePath}`);
             if (entry.isDirectory()) walk(absolutePath, relativePath);
@@ -173,7 +174,10 @@ export function updateSkill({ installDir, checkOnly = false, git = runGit } = {}
             const destination = path.join(staging, entry);
             fs.rmSync(destination, { recursive: true, force: true });
             const source = path.join(checkout, entry);
-            if (fs.existsSync(source)) fs.cpSync(source, destination, { recursive: true });
+            if (fs.existsSync(source)) {
+                fs.mkdirSync(path.dirname(destination), { recursive: true });
+                fs.cpSync(source, destination, { recursive: true });
+            }
         }
         if (!equal(fileMap(staging), remoteFiles)) throw new Error("暂存文件不完整，停止安装");
         writeReceipt(staging, remoteCommit, remoteFiles);

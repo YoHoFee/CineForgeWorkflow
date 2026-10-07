@@ -11,6 +11,8 @@
 | 名称 | 用途 | 依赖级别 |
 | --- | --- | --- |
 | `$short-drama` | 项目路由、初始化和跨阶段规划 | 必需 |
+| `$short-drama-develop` | 故事开发、改编方向和分集规划 | 按阶段使用 |
+| `$short-drama-novel-analyze` | 原著和长材料分析 | 按阶段使用 |
 | `$short-drama-write` | 编写和修订剧本 | 按阶段使用 |
 | `$short-drama-assets` | 角色、造型、场景、道具和连续性设定 | 按阶段使用 |
 | `$short-drama-image-prompts` | 图片提示词编写 | 按阶段使用 |
@@ -53,10 +55,32 @@ references/                      状态、需求路由、视频提示词交接�
 references/test-protocol.md     模拟全流程测试契约
                                固定模式：REAL-CANVAS-BLIND-PREPROD-V1
 scripts/workflow-state.mjs       状态初始化与校验脚本
+skills/cineforge-dependencies/   独立依赖安装 Skill、固定清单和实际安装脚本
 ```
 
 Skill 当前仍以 `$short-video-workflow` 的名称被发现和调用；仓库名称为
 `CineForgeWorkflow`，中文名称为“影铸工作流”。
+
+## 首次安装与依赖恢复
+
+说“安装影铸依赖”即可触发独立的 `$cineforge-dependencies`，列出职责和本机状态，自动
+补齐 11 个 Drama Skills 与 Infinite Canvas；要求全套或剪辑时补齐 ChatCut。清单固定使用
+已核验上游，已有有效依赖跳过，损坏的用户级 Skill 先备份，安装后复核实际状态。
+首次渠道配置/账号登录由 Agent 打开正确入口引导；新装工具尚未加载时提示开启新 Agent。
+正常生产不扫描依赖；执行中确认缺失时只恢复当前需要的项，连接失败不触发重装。
+
+安装入口见 [依赖安装 Skill](skills/cineforge-dependencies/SKILL.md)。它既可把整个目录安装为
+独立 Skill，也可由主 Skill 直接加载附带版本，因此首次安装不依赖另一份安装器先存在。
+
+```powershell
+node skills/cineforge-dependencies/scripts/dependencies.mjs inspect
+node skills/cineforge-dependencies/scripts/dependencies.mjs install
+node skills/cineforge-dependencies/scripts/dependencies.mjs install --with-editing
+node skills/cineforge-dependencies/scripts/dependencies.mjs install --only=infinite-canvas@infinite-canvas-local
+```
+
+Node、Git、Codex CLI 和 Python 缺失时由 Agent 先定位宿主运行时或按安装指引自动补齐。
+脚本的 `ready` 只有本轮所需依赖均可核验时才为真；运行时安装不以一份命令清单代替。
 
 ## 检查或更新影铸工作流
 

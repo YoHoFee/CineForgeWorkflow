@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "skills": [
+    { "id": "short-drama", "purpose": "项目初始化、阶段路由和 Dashboard", "level": "required", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama" },
+    { "id": "short-drama-develop", "purpose": "故事开发和分集规划", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-develop" },
+    { "id": "short-drama-novel-analyze", "purpose": "原著与长材料分析", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-novel-analyze" },
+    { "id": "short-drama-write", "purpose": "剧本写作和修订", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-write" },
+    { "id": "short-drama-assets", "purpose": "角色、场景、道具和连续性", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-assets" },
+    { "id": "short-drama-image-prompts", "purpose": "图片提示词", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-image-prompts" },
+    { "id": "short-drama-storyboard", "purpose": "分镜和冻结关键帧", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-storyboard" },
+    { "id": "short-drama-video-prompts", "purpose": "视频运动提示词", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-video-prompts" },
+    { "id": "short-drama-produce", "purpose": "明确确认后的媒体生产", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-produce" },
+    { "id": "short-drama-edit", "purpose": "剪辑、字幕、声音和成片交付", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-edit" },
+    { "id": "short-drama-review", "purpose": "项目内容和媒体质量审查", "level": "stage", "repository": "https://github.com/zenstory-ai/drama-skills.git", "ref": "main", "path": "skills/short-drama-review" },
+    { "id": "infinite-canvas-bridge", "purpose": "可选 Canvas 协同别名；插件入口可直接替代", "level": "optional", "repository": null, "ref": null, "path": null }
+  ],
+  "plugins": [
+    {
+      "id": "infinite-canvas@infinite-canvas-local",
+      "name": "infinite-canvas",
+      "purpose": "Canvas 可视化、参考绑定、生成配置和任务查询",
+      "level": "required",
+      "marketplace": "infinite-canvas-local",
+      "repository": "https://github.com/basketikun/infinite-canvas.git",
+      "ref": "main",
+      "marketplacePath": ".agents/plugins/marketplace.json",
+      "providedSkills": ["open-canvas", "canvas"]
+    },
+    {
+      "id": "chatcut@chatcut-inc",
+      "name": "chatcut",
+      "purpose": "可编辑素材导入、时间线剪辑和成片导出",
+      "level": "editing",
+      "marketplace": "chatcut-inc",
+      "repository": "https://github.com/ChatCut-Inc/agent-plugin.git",
+      "ref": "main",
+      "marketplacePath": ".agents/plugins/marketplace.json",
+      "providedSkills": ["chatcut-plugin-basics", "asset-import", "export"]
+    }
+  ],
+  "runtimes": [
+    { "id": "node", "purpose": "依赖安装和影铸状态脚本", "level": "required" },
+    { "id": "git", "purpose": "从已核验上游下载 Skill", "level": "required" },
+    { "id": "codex", "purpose": "插件 inventory、marketplace 注册和实际安装", "level": "required" },
+    { "id": "python", "purpose": "Drama Skills 脚本，要求 Python 3.9+", "level": "required" },
+    { "id": "ffmpeg", "purpose": "需要本地媒体处理或剪辑渲染时使用", "level": "local-media" },
+    { "id": "ffprobe", "purpose": "需要本地媒体流检查时使用", "level": "local-media" }
+  ]
+}
