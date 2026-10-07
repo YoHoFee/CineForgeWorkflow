@@ -9,6 +9,14 @@ description: 编排短视频、短剧、漫剧、动画和 AIGC 视频项目；�
 剧本、视觉设定、图片提示词、分镜、视频提示词或剪辑。创作事实仍以项目的五份
 creator-first Markdown 为准；Canvas 是可视化、绑定和生产基础设施，不是第五套事实源。
 
+## 问题排查
+
+遇到 Canvas 启动/连接、渠道配置、媒体 API、生成状态或结果回写问题时，**先读取**
+[问题指引](references/problem-guide.md)，再检查日志、查询任务、重试或修改流程。先匹配
+已知症状和排查顺序；指引是定位线索，不替代实时状态、当前供应商文档或安全闸门。
+没有匹配案例时，按本文与相关 reference 的契约排查；确认新的可复用根因后，补充一条
+脱敏案例和验证方式，不记录密钥、用户路径、项目/客户端 ID、提示词或媒体内容。
+
 ## 冷启动
 
 短视频项目启动即自动连接 Infinite Canvas，不等待用户再次要求；`stage_only` 也不跳过
@@ -16,33 +24,62 @@ creator-first Markdown 为准；Canvas 是可视化、绑定和生产基础设�
 
 1. 读取项目 `AGENTS.md`、`README.md`、`short-drama.json`（如有）和
    `.short-drama/workflow-state.json`（如有）。
-2. 读取并锁定 [Canvas Origin 锁定契约](references/canvas-origin-lock.md) 中的
-   `canvas.origin`。如果当前浏览器已有 Canvas 页面，先从可观察 URL 提取 origin；
-   不得让第三方 `open-canvas` 的默认在线地址覆盖已有 origin。确保
+2. 读取 [Canvas Origin 选择契约](references/canvas-origin-lock.md) 中的
+   `canvas.origin`。如果当前浏览器已有有效 Canvas 页面，先从可观察 URL 提取
+   origin；如果没有可核验连接，再检查项目状态中目标画布的 origin，最后使用默认
+   `https://canvas.best`。项目状态中的旧 origin 不是永久锁，不能覆盖当前有效页面或
+   使新项目无法使用默认入口。确保
    `canvas_get_state` 与 `infinite-canvas:open-canvas` 可用。`open-canvas` 是启动流程
    Skill，不是一个缺失的 MCP 函数；工具未出现在初始列表时，立即用 `tool_search` 搜索
    `canvas_get_state open-canvas`，加载状态工具并遵循启动 Skill，再继续。
 3. 先调用 `canvas_get_state` 探测当前连接。
 4. 若没有 `hasCanvas=true`、`projectId` 和共享 `clientId`，调用
-   `infinite-canvas:open-canvas` 的启动流程，但必须使用已锁定的 origin。在线冷启动应复用普通 Canvas Agent；没有运行实例时启动
+   `infinite-canvas:open-canvas` 的启动流程，但必须使用本轮选定的 origin。在线冷启动应复用普通 Canvas Agent；没有运行实例时启动
    `npx -y @basketikun/canvas-agent@latest`（不要启动 `... mcp` 代替网页 Agent），
    等待 `Local URL` 与 `Connect token`，在同一 origin 打开带
    `#agentUrl`/`#agentToken` 的 Canvas 页面，然后再次调用 `canvas_get_state`。
-   已有可匹配页面或 Agent 时必须复用，不得启动第二实例，也不得从
-   `http://localhost:3000` 跳到 `https://canvas.best` 或反向跳转。
-   锁定本地 origin 时使用本地前端相对路由或本地启动流程，不得调用
-   `open-canvas` 的默认在线启动路径。
+   已有可匹配页面或 Agent 时必须复用，不得启动第二实例。不同 origin 不能互相
+   代替；如果本轮选定的 origin 连接失败，先排查该 origin 的前端、Agent、SSE
+   客户端和路由，不得静默切换到另一个 origin 绕过问题。
 5. 只有复核再次返回完整 `hasCanvas/projectId/clientId` 才算连接成功；锁定这组
    `projectId/clientId`，并将实时浏览器 origin 记录到 `canvas.origin`；所有 UI 和
-   MCP 写入都必须落到同一 origin 的 `/canvas/<projectId>` 页面。不得使用
-   `mode=new`、随机 Canvas 标签、另一 origin 或另一套状态掩盖映射问题。具体规则见
-   [canvas-origin-lock.md](references/canvas-origin-lock.md)。
+   MCP 写入都必须落到同一 origin 的 `/canvas/<projectId>` 页面。`mode=new` 只允许
+   用于用户要求独立项目，或默认 `https://canvas.best` 上的目标被占用且用户没有指定
+   必须复用某个既有项目的场景。具体规则见 [canvas-origin-lock.md](references/canvas-origin-lock.md)。
+
+如果用户明确要求打开某个已有 Canvas 项目，而实时检测发现该画布已经被其他 Agent
+打开或连接占用，不要报“画布不可用”，直接提醒用户：
+
+> 目标画布已经被其他 Agent 打开，请先关闭旧 Agent 的画布连接或对应画布标签页，
+> 关闭后再通知我继续。
+
+等待用户处理期间只允许只读检查，不创建节点、不重命名、不连线、不提交生成任务。
+如果用户只是要测试、并行处理或打开一个独立项目，而没有指定必须复用该项目，则在
+同一 origin 使用 `mode=new` 打开新的独立画布；不得切换新端口。若用户指定必须复用
+原项目，则等待旧连接释放后重新调用 `canvas_get_state`，确认
+`hasCanvas/projectId/clientId` 后再继续。
+
+### 渠道配置
+
+渠道配置属于 **Canvas 网页 origin**，不属于某个 `projectId`。因此切换画布不需要
+逐个画布复制配置；所有新 Agent 必须打开同一个已配置 origin，配置自然可用。
+
+- 默认渠道 origin 为 `https://canvas.best`。如果当前浏览器已有可核验页面，或用户
+  明确指定了其他部署，则本轮沿用该 origin；这不是跨所有项目的永久锁定。
+- 每个 origin 的渠道配置和画布数据彼此隔离。连接前后必须保持本轮选定的同一 origin；
+  如果新 Agent 进入了另一个 origin，先按 `canvas_origin_mismatch` 排查，不要把它当作
+  新画布，也不要用切换 origin 绕过连接失败。
+- 对本轮选定的 origin，先检查网页入口、Agent `/health`、客户端连接和
+  `canvas_get_state`。只有确认该 origin 的 `/config` 没有可用渠道，才能报告
+  `channel_config_missing`；不能把另一个 origin 的空配置误报成渠道丢失。
 
 页面存在、MCP 工具已加载、Agent 进程存在或聊天中说过“已连接”都不是连接证据。完成
 上述启动/复核前，不得向用户报告“画布不可用”；复核仍失败时才报告具体的
 `no_canvas_tab`、`agent_unavailable`、`frontend_unreachable`、`route_mismatch`、
-`shared_client_missing` 或 `state_stale`，并停止依赖 Canvas 的动作。在线 Canvas 不要求
-本地项目目录；只有项目明确选择本地前端时才检查本地前端并切换其工作空间。
+`shared_client_missing`、`canvas_origin_mismatch` 或 `channel_config_missing`，并停止
+依赖 Canvas 的动作。若明确检测到目标画布被其他 Agent/client 占用，使用
+`canvas_occupied` 进入用户提示和只读等待分支，不把它改写成普通连接失败。在线 Canvas
+不要求本地项目目录。
 
 新建或恢复默认画布时，第一项写入必须是保存
 `项目简称｜任务主题｜制作阶段`；重命名后重新查询状态。默认标题未改成功前不得创建节点。
@@ -61,6 +98,13 @@ creator-first Markdown 为准；Canvas 是可视化、绑定和生产基础设�
    再建立独立的视频批次、参考绑定和视频报告。
 6. 实时读取 Canvas，核对节点、媒体证据、语义角色、连线端点和当前批次 config，
    通过后才写 `ready_for_confirmation`。
+
+## 画布排布与剪辑交付
+
+新建视频批次、整理画布、导出采用素材或交付成片前，先读取
+[Canvas 排布、导出与 ChatCut 交付](references/canvas-layout-and-chatcut-delivery.md)。
+它定义项目通用的片段排布、节点到导出文件的确定性映射、manifest 校验和 ChatCut
+剪辑交接；不得凭聊天记忆、随机下载文件名或画布位置推断素材对应关系。
 
 ## Owner 路由
 
@@ -82,6 +126,9 @@ Canvas 协同优先使用 `$infinite-canvas-bridge`；该 Skill 不可用时，�
 
 - 新流程的角色参考只有一张 `character-design-sheet`，同一张图包含展示、正/侧/背、
   细节和面部区域；不得创建或连接 `character-sketch`、`character-turnaround`。
+  如果项目生产档案或 owner 明确选择“身份/造型分离”版式，全身视图使用无五官白脸，
+  面部身份由旁侧独立正面和侧面特写提供；否则沿用项目已确认的角色设定图版式。具体
+  分区和生成/视频提示词措辞见 [资产设定图模板](references/asset-sheet-templates.md)。
 - `IMG-*` 是提示词条目，不是图片。参考图只能来自真实项目文件、真实附件或实时 Canvas
   图片节点；需要上传用户图片时使用 `canvas_create_attachment_nodes`。不得创建只有标题、
   尺寸、`assetId` 或 metadata 的空图片节点。
@@ -118,6 +165,14 @@ Canvas 协同优先使用 `$infinite-canvas-bridge`；该 Skill 不可用时，�
   “继续”“提示词已接受”或上一次确认都不算本次授权。
 - `$short-drama-produce` 只执行已确认的当前 modality、报告指纹和 targets；提交后用
   `generation_get_status` 恢复，不重复提交已有任务。
+- 镜头时长优先容纳完整镜头；不可为了凑满单次上限主动拆镜或拖长。仅当完整镜头无法
+  落入模型合法时长时才考虑拆分，并按
+  [视频片段链契约](references/video-segment-chain.md) 区分连续镜头与明确切镜。
+- 提示词需写清每张参考图控制什么/不控制什么，以及镜头方位、运动方向、人物和场景
+  连续性；避免静态站桩式对白和违反空间关系的背景运动。详见
+  [视频提示词交接契约](references/video-prompt-handoff.md)。
+- 默认只生成/保留对白、人声和叙事音效，不添加背景音乐；只有创作者明确授权本集
+  配乐时才例外，通常在 ChatCut 后期统一加入。
 
 ## 状态与恢复
 
@@ -131,6 +186,10 @@ Canvas 协同优先使用 `$infinite-canvas-bridge`；该 Skill 不可用时，�
 
 失败、重连或新 Agent 从项目文件和状态恢复。遇到项目映射、真实媒体、参考语义、连线、
 提示词交接或确认缺口，保持 `blocked`/失败并报告具体缺口，不创建替代画布。
+
+遇到运行故障时，先按上文读取 [问题指引](references/problem-guide.md)，然后再进行对应
+的只读核查与恢复；不要因供应商已接受任务就重复提交，也不要仅凭节点错误状态断定供应商
+生产失败。
 
 修改本 Skill、reference、状态脚本或界面元数据后，按
 `references/test-protocol.md` 的 `REAL-CANVAS-BLIND-PREPROD-V1` 执行真实 Canvas 盲跑；

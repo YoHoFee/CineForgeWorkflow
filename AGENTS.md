@@ -24,33 +24,36 @@
 不要求用户在请求中再次点名。冷启动或新 Agent 启动时，必须自动执行：
 
 ```text
-项目预检 -> 读取/锁定 Canvas origin -> 加载/发现 Infinite Canvas 工具
+项目预检 -> 选择/核验 Canvas origin -> 加载/发现 Infinite Canvas 工具
 -> canvas_get_state 探测 ->（无效时）同 origin 的 open-canvas 启动
 -> canvas_get_state 复核 -> 核对 hasCanvas/projectId/clientId/origin
 ->（可观察时核对路由和标题）-> 继续工作
 ```
 
 只要尚无实时可核验连接，就遵循 [Canvas Origin 锁定契约](references/canvas-origin-lock.md)
-复用或启动同一 origin 的网页连接；
+复用或启动本轮选定 origin 的网页连接；
 `open-canvas` 是启动流程 Skill，不是一个缺失的 MCP 函数；
 不得先向用户报告“画布不可用”，也不得等待用户补充“请连接画布”。初始工具列表里
 没有 Canvas 工具时，必须立即调用 `tool_search` 搜索 `canvas_get_state open-canvas`
-并加载这两个工具，不得把工具未加载当作连接失败。默认沿用当前页面或状态中锁定的
-origin；只有全新项目且没有任何 origin 事实时才按项目规则选择本地/在线前端。
+并加载这两个工具，不得把工具未加载当作连接失败。所有新 Agent 和项目统一使用
+当前页面中实际核验的 origin；没有可复用页面或目标项目时默认使用
+`https://canvas.best`，不根据随机标签或旧状态静默切换 origin。
 `stage_only` 只限制
 创作阶段，不取消这次基础连接。若实时状态没有暴露浏览器 URL，可由 `projectId` 推导
 `/canvas/<projectId>`；只有实际观察到的 URL 与实时项目 ID 冲突时才算路由不匹配。
-如果锁定的 origin 是 `http://localhost:3000`，不得跳转到 `https://canvas.best`；
-如果锁定的 origin 是 `https://canvas.best`，也不得切换到本地地址。若项目明确选择本地
-Canvas 前端，必须先将其工作空间切换到当前项目根目录；在线 Canvas
-没有本地工作空间时，只用实时 `projectId` 与项目状态绑定，不要因不存在目录而失败。
+如果项目状态已有 `canvas.origin`，先验证它是否仍能访问目标项目；如果当前页面已有
+有效实时连接，则沿用当前页面 origin。在线 Canvas 没有本地工作空间时，只用实时
+`projectId` 与项目状态绑定，不要因不存在目录而失败。
+没有可复用页面或目标项目时，默认打开 `https://canvas.best`；本地
+`http://localhost:3000` 只能在用户明确指定或当前页面已核验时使用。
 一旦 `canvas_get_state` 返回完整连接，返回的 `projectId/clientId` 和 origin 就锁定本轮唯一
-写入目标；不得再用 `mode=new` 打开第二页、切换 origin 或在随机标签上重命名、建节点、连线。UI 操作必须
+写入目标；不得在同一项目执行中途切换 origin 或在随机标签上重命名、建节点、连线。只有用户要求
+独立项目，或默认 `https://canvas.best` 的目标被占用且用户没有指定必须复用旧项目时，才可在
+同一 origin 用 `mode=new` 打开第二页。UI 操作必须
 在与实时项目路由一致的页面完成，重命名后必须再次实时查询；如果 UI 已显示生产标题而
 MCP 只返回旧的默认标题，只要 projectId、clientId 和 route 仍一致即可继续使用 UI 标题；
 两个不同的非默认标题或身份/路由/origin 不一致时，才停止写入并归类为 `state_stale`、
 `route_mismatch`、`canvas_origin_mismatch` 或 `shared_client_missing`。
-
 ## 修改纪律
 
 - 修改工作流规则时，同时审计相关 reference 文档和辅助脚本。
@@ -151,9 +154,8 @@ MCP 只返回旧的默认标题，只要 projectId、clientId 和 route 仍一�
   不得把“测试节点”“模拟图片”或“未运行测试”等词写入 Canvas。
 - 向开发者汇报时，测试产物必须使用可点击的 Markdown 绝对文件链接，至少分别提供
   待确认制作包、最终状态快照和审计日志的链接；不得只给纯文本相对路径或临时目录。
-- 向开发者汇报时还必须提供真实测试画布链接，使用实时状态核验过的前端 origin
-  加 `/canvas/<projectId>` 生成可点击链接。默认在线模式使用在线 Canvas origin；
-  只有项目或测试明确选择本地模式时才使用 `http://localhost:3000/canvas/<projectId>`。
+- 向开发者汇报时还必须提供真实测试画布链接，使用实时状态核验过的
+  Canvas origin 加 `/canvas/<projectId>` 生成可点击链接。
   只有在测试明确降级或失败时，才可以另外提供 local fixture 快照，并明确标注
   “本地画布快照，不是真实画布”，不得伪造真实 Canvas URL。
 - 前端 origin 必须来自主 Agent 实际观察到的浏览器 URL 或连接信息；任何

@@ -18,8 +18,8 @@ node <skill-root>/scripts/workflow-state.mjs record-canvas <project-root> `
   --route-path=/canvas/<projectId> --title="项目简称｜任务主题｜制作阶段"
 ```
 
-该命令只登记实时连接事实，不会启动 Canvas、创建节点或触发生产；它会拒绝项目路由
-不一致和缺失共享 `clientId`。默认标题可以先登记连接，但在创建第一个节点或进入
+该命令只登记实时连接事实，不会启动 Canvas、创建节点或触发生产；它会拒绝不规范的
+origin、项目路由不一致和缺失共享 `clientId`。默认标题可以先登记连接，但在创建第一个节点或进入
 确认前必须通过实时页面重命名为生产语义标题。
 如果切换到另一个 Canvas `projectId`，只有在没有活动/已确认批次时才允许登记；脚本会
 清空旧项目的节点、连线、参考绑定、当前 config 和 `videoReferenceIds`，必须重新记录
@@ -181,9 +181,9 @@ config/`MOTION-*` 明确提供；不应让脚本凭节点顺序猜测。
 - `canvas.status`：`not_evaluated`、`connected`、`unavailable`、`degraded`、`mismatch`
 - `canvas.lastCheckedAt`：最近一次实际检查 Canvas 的时间；未检查时为 `null`
 - `canvas.projectId`：最近一次通过实时查询确认的 Canvas 项目 ID
-- `canvas.origin`：最近一次实时核验的浏览器 origin，例如
-  `http://localhost:3000` 或 `https://canvas.best`。渠道和模型配置按 origin 隔离；
-  新 Agent 恢复时必须复用该 origin，不能由第三方启动 Skill 的默认地址覆盖。
+- `canvas.origin`：最近一次实时核验的浏览器 origin。渠道和模型配置按 origin 隔离；
+  它是恢复线索而不是跨项目永久锁。新 Agent 应先核验当前页面/目标项目，缺少可复用
+  连接时默认使用 `https://canvas.best`。
 - `canvas.routePath`：最近一次实时核验或由实时 `projectId` 推导的项目路由，必须为
   `/canvas/<projectId>`；如果浏览器 URL 可观察，应优先记录实测路由
 - `canvas.clientId`：最近一次实时核验的共享 Canvas client/session 标识

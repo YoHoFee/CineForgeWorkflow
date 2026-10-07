@@ -8,7 +8,6 @@ const [command = "validate", projectArg = process.cwd(), ...args] = process.argv
 const project = path.resolve(projectArg);
 const stateFile = path.join(project, ".short-drama", "workflow-state.json");
 const projectProfileFile = path.join(project, "short-drama.json");
-
 const emptyState = {
     schemaVersion: 4,
     projectId: null,
@@ -123,9 +122,6 @@ if (command === "record-canvas") {
     }
     if (!normalizedClientId) errors.push("--client-id 必须是非空共享 clientId");
     if (!origin) errors.push("--origin 必须是没有路径、查询或片段的 http(s) origin");
-    if (state.canvas?.origin && origin && state.canvas.origin !== origin) {
-        errors.push(`Canvas origin 已锁定为 ${state.canvas.origin}，不能静默切换到 ${origin}`);
-    }
     if (!routePath || !/^\/canvas\/[^\s/?#]+$/u.test(routePath)) {
         errors.push("--route-path 必须匹配 /canvas/<projectId>");
     } else if (projectId && routePath !== `/canvas/${projectId}`) {
@@ -143,7 +139,12 @@ if (command === "record-canvas") {
         && state.canvas?.clientId
         && state.canvas.clientId !== normalizedClientId,
     );
-    if ((switchingCanvasProject || changingCanvasClient)
+    const changingCanvasOrigin = Boolean(
+        state.currentCanvasProjectId === projectId
+        && state.canvas?.origin
+        && state.canvas.origin !== origin,
+    );
+    if ((switchingCanvasProject || changingCanvasClient || changingCanvasOrigin)
         && (state.activeBatchId
             || ["ready_for_confirmation", "confirmed", "in_production", "completed"].includes(state.preproductionStatus)
             || ["submitted", "completed"].includes(state.videoGenerationStatus))) {
@@ -152,7 +153,7 @@ if (command === "record-canvas") {
     if (!isValidDateString(checkedAt)) errors.push("--checked-at 必须是有效 ISO 时间字符串");
     if (errors.length) fail(errors.join("; "));
 
-    const canvasIdentityChanged = switchingCanvasProject || changingCanvasClient;
+    const canvasIdentityChanged = switchingCanvasProject || changingCanvasClient || changingCanvasOrigin;
     if (canvasIdentityChanged) clearCanvasDerivedBindings(state);
     state.projectId = projectId;
     state.currentCanvasProjectId = projectId;

@@ -168,9 +168,17 @@ Canvas 页面；已有匹配页面或 Agent 时不得启动第二实例。随后
 能观察浏览器 URL 时，必须核对它与实时 `projectId` 一致；只有观察到冲突才是
 `route_mismatch`。多个 Canvas 标签时不能依赖随机当前标签，也不能因为标签存在、插件
 MCP 进程存在、页面标题正常或聊天历史中的“已连接”而跳过探测和重试。
+
+如果用户指定的目标画布已被其他 Agent/client 打开，按 `canvas_occupied` 提示用户先
+关闭旧 Agent 的画布连接或标签页；这不是普通错误。用户处理前只能只读检查，不能创建
+节点、切换端口、改变标题、连线或提交生成。若用户没有指定必须复用该项目，只是测试、
+并行处理或需要独立项目，则在同一 origin 使用 `mode=new` 创建新的独立画布；收到用户
+继续指示或新画布建立后，重新执行 `canvas_get_state` 并核对项目 ID、clientId 和路由。
+
 一旦 `canvas_get_state` 返回完整连接，返回的 `projectId/clientId` 与浏览器 origin 就锁定
-本轮唯一写入目标；不得再打开 `mode=new`、切换站点 origin 或在随机标签上重命名、建节点、
-连线。UI 操作必须在与实时项目路由和 origin 一致的页面完成，并在每次重命名后重新查询
+本轮唯一写入目标；不得在同一项目执行中途切换站点 origin 或在随机标签上重命名、建节点、
+连线。只有独立新画布分支才允许在同一 origin 使用 `mode=new`。UI 操作必须在与实时项目
+路由和 origin 一致的页面完成，并在每次重命名后重新查询
 实时状态；如果 UI 已显示生产标题而
 MCP 只返回旧的默认标题，只要 projectId、clientId 和 route 仍一致即可继续使用 UI 标题；
 两个不同的非默认标题或身份/路由不一致时，才停止写入并归类为 `state_stale`、
@@ -203,20 +211,23 @@ client ID、节点或连接数组的快照，并阻止用一个已连接项目�
 
 连接阻断必须归类为以下之一：`no_canvas_tab`、`agent_unavailable`、
 `frontend_unreachable`、`state_stale`、`route_mismatch`、`shared_client_missing`、
-`canvas_origin_mismatch`。
+`canvas_origin_mismatch`、`canvas_occupied`。其中 `canvas_occupied` 只表示目标画布已被
+其他 Agent/client 占用，必须进入用户提示和只读等待分支，不得创建替代画布或继续写入。
 UI 已显示生产标题且身份/路由一致时，MCP 的默认标题读模型延迟不属于连接阻断；
 不得只报告“画布不可用”。
 
-默认模式沿用当前浏览器页面或项目状态中已锁定的 Canvas origin。只有没有任何锁定
-origin 的全新项目，才按项目规则选择在线或本地前端；锁定 `http://localhost:3000`
-后不得静默切换到 `https://canvas.best`，反之亦然。`http://127.0.0.1:17371` 是普通
-Canvas Agent 的本地连接地址，不是网页 origin。`canvas_get_state` 失败时必须先完成启动/重连尝试，再报告具体
-启动环节，不得把“没有打开标签”概括为项目画布损坏。`open-canvas` 不可发现时，按
-同一启动动作使用浏览器和终端完成，不得把工具缺失报告成连接失败。
+默认模式优先使用当前浏览器页面中实际核验的 Canvas origin；没有可复用页面或目标项目
+时默认使用 `https://canvas.best`。项目状态中的 origin 只是恢复线索，不是跨项目永久
+锁；重新绑定到另一个已核验 origin 时必须重新记录，并在存在活动批次时阻止切换。渠道
+配置保存在 origin 级浏览器存储，同一 origin 下的不同 Canvas 项目自动共享渠道，但
+不同 origin 不能互相替代。`http://127.0.0.1:17371` 是普通 Canvas Agent 的本地
+连接地址，不是网页 origin。`canvas_get_state` 失败时必须先在本轮选定的 origin 完成
+前端、Agent、SSE 客户端和路由排查，再报告具体启动环节；不得把“没有打开标签”概括为
+项目画布损坏，也不得静默切换 origin 绕过失败。`open-canvas` 不可发现时，按同一
+启动动作使用浏览器和终端完成，不得把工具缺失报告成连接失败。
 
 在线 Canvas 项目不是本地文件夹，不得因为它没有“当前工作空间目录”就判定连接失败；
-项目文件目录与 Canvas `projectId` 的对应关系由工作流状态记录。只有项目明确选择本地
-前端时，才检查本地前端地址，并把其工作空间切换到当前项目根目录。
+项目文件目录与 Canvas `projectId` 的对应关系由工作流状态记录。
 
 连接记录还必须保存经 UI 观察到的画布标题。默认标题不阻断冷启动连接，但新建或恢复
 默认标题时，必须先用 Canvas 的重命名控件保存 `项目简称｜任务主题｜制作阶段`，再创建

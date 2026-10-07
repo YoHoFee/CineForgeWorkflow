@@ -38,7 +38,8 @@ Canvas fixture 演练，而是在真实 Infinite Canvas 上执行所有非生成
 5. 真实 Canvas 必须创建、保存并完成正常生产节点、元数据和连线；测试结束前保留
    浏览器标签、画布和 Agent 连接。
    `canvas_get_state` 返回完整连接后，测试运行器只能操作该实时
-   `projectId/clientId` 对应的页面；不得再打开 `mode=new` 或使用随机标签。任何 UI
+   `projectId/clientId` 对应的页面；除非明确验证“独立新画布”分支，否则不得再打开
+   `mode=new` 或使用随机标签。任何 UI
    重命名后都必须重新查询实时状态，项目 ID、标题和 client/session 不一致时立即判定
    Canvas 交接失败。
 6. 画布可见内容必须是正常视频生产准备态；所有测试标记、拦截记录、状态判断和
@@ -47,15 +48,14 @@ Canvas fixture 演练，而是在真实 Infinite Canvas 上执行所有非生成
    主 Agent 必须通过实时 `canvas_get_state` 或等价查询重新读取项目，并逐项对齐
    项目 ID、节点数量、节点 ID/类型/生产语义、连线数量和端点；空画布、项目 ID
    不符或关键节点/连线缺失都必须失败。
-   同时必须核对浏览器前端 origin 与项目状态中的 `canvas.origin`；锁定
-   `http://localhost:3000` 时不得使用 `https://canvas.best` 的页面或渠道存储，反之
-   亦然。origin 不一致必须记录 `canvas_origin_mismatch` 并失败。
+   同时必须核对浏览器前端 origin 与本轮选定的目标 origin。项目状态中的旧
+   `canvas.origin` 需要先作为恢复线索验证；若重新绑定到另一个已核验 origin，必须
+   记录新 origin，并在存在活动批次时失败。
 8. 子 Agent 必须使用主 Agent 可重新读取的同一真实 Canvas 会话或明确共享的
    Canvas Agent 连接；子 Agent 私有浏览器、私有 MCP 客户端或隔离进程中的节点，
    即使有完整快照，也不得视为真实交互。
 9. 主 Agent 必须重新读取原始产物、查询实时 Canvas、校验状态并独立审计后才可
    汇报；子 Agent 自检不能替代主 Agent 审计。
-
 ## 2. 触发条件
 
 以下任一文件发生行为性修改时，必须执行本测试：
@@ -129,8 +129,9 @@ runner-bundle/
 
 `skill/SKILL.md`、`skill/references/` 和 `skill/scripts/` 必须来自本次修改后的明确版本。
 `skill/references/` 只放生产 allowlist，至少包含 `unified-contract.md`、`workflow-state.md`、`intake-and-routing.md`、
-`asset-sheet-templates.md`、`preproduction-report.md`、`video-prompt-handoff.md` 和
-`video-segment-chain.md`，不得包含 `test-protocol.md` 或 `runner-input-template.md`。
+`asset-sheet-templates.md`、`preproduction-report.md`、`video-prompt-handoff.md`、
+`video-segment-chain.md` 和 `problem-guide.md`，不得包含 `test-protocol.md` 或
+`runner-input-template.md`。
 `project/AGENTS.md` 必须由主 Agent 从生产规则生成，不能直接复制仓库根 `AGENTS.md`。
 运行器只看这份快照及生产部分，不读取仓库中带有本测试契约的控制面文件。生产代理在运行器
 外部工作：它可以预先登记完整的成功图片记录，或拦截生产调用并返回正常结果，但

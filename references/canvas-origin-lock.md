@@ -1,53 +1,77 @@
-# Canvas Origin 锁定契约
+# Canvas Origin 选择与绑定契约
 
 Infinite Canvas 的渠道、默认模型和 API 凭据保存在网页端本地存储中。它们按
-浏览器 origin 隔离；`http://localhost:3000` 与 `https://canvas.best` 不是同一份
-渠道配置。Canvas 项目 ID 和 Agent clientId 一致，也不能把两个 origin 的配置视为
-可以互换。
+浏览器 origin 隔离；不同 origin 不是同一份渠道配置。Canvas 项目 ID 和 Agent
+clientId 一致，也不能把两个 origin 的配置视为可以互换。
 
-## 启动规则
+## 冷启动与选择优先级
 
-1. 每次短视频工作流冷启动先读取项目状态中的 `canvas.origin`。
-2. 如果当前 Codex 浏览器页面 URL 可观察，提取它的 origin。已存在的项目状态
-   origin 优先；当前页面只有在与状态 origin 一致时才可复用。
-3. 如果当前页面已经是 `/canvas/<projectId>`，先调用 `canvas_get_state`，不要因为
-   `open-canvas` 的默认在线地址而重新打开页面。
-4. `canvas_get_state` 返回有效 `projectId/clientId` 后，必须在同一个 origin 下对齐
-   `/canvas/<projectId>` 路由，再次查询确认。不能用另一 origin 的页面满足路由检查。
-5. `canvas.origin` 已经存在时，禁止调用会改变 origin 的默认启动路径。需要启动
-   页面时，必须使用同一 origin 的启动方式；第三方 `open-canvas` 默认在线地址不能
-   覆盖本项目已锁定的 origin。
-6. origin、项目 ID、路由或 clientId 任一不一致时，停止写入并报告
-   `canvas_origin_mismatch`、`route_mismatch` 或 `shared_client_missing`。不得创建
-   新项目、清空配置、切换到另一站点或要求 Agent 猜测渠道。
+1. 先调用 `canvas_get_state`，有完整连接时沿用当前实时页面的 origin 和项目。
+2. 没有完整连接时，如果用户指定了已有项目且状态记录的 origin 仍可访问，先使用
+   该项目记录的 origin；如果状态只留下旧的、不可核验的 origin，不得把它当作永久锁。
+3. 没有可复用的有效页面或目标项目时，默认使用 `https://canvas.best`。
+4. 页面必须打开在本轮选定的 origin，然后再次调用 `canvas_get_state`。
+5. 复核得到 `hasCanvas=true`、`projectId` 和共享 `clientId` 后，继续使用同一
+   origin 下的 `/canvas/<projectId>`；这一组身份只锁定本轮写入目标，不锁定未来所有
+   项目的 origin。
+6. 不得根据随机标签或旧状态静默切换 origin；但当用户明确选择另一个部署，或需要把
+   一个没有活动批次的项目重新绑定到另一个可核验 origin 时，可以重新选择并记录新 origin。
 
-当锁定 origin 为 `http://localhost:3000` 时，使用本地前端的相对 Canvas 路由或本地
-启动流程，禁止调用第三方 `open-canvas` 的默认在线启动路径；当锁定 origin 为
-`https://canvas.best` 时，才使用在线启动流程。两种模式都必须复用已有普通 Canvas
-Agent，不得因为切换启动入口而创建第二个 Agent。
+`http://127.0.0.1:17371` 只是 Canvas Agent 的连接服务地址，不是网页 origin。
+
+全新 Agent 没有项目状态且没有可复用页面时，默认使用 `https://canvas.best`。
+本地 `http://localhost:3000` 仍可作为用户明确指定或当前页面已经核验的独立部署，
+不能因为默认值而强行切换到在线版。
+
+## 渠道配置初始化
+
+渠道配置只需在实际使用的 Canvas origin 的配置页初始化一次。它不是画布节点数据，
+也不是 `projectId` 的属性；换画布只改变 `projectId`，不改变 origin。同一 origin
+下的所有画布和后续 Agent 自动共享同一份渠道配置，不需要逐个画布导入。
+
+默认在线入口是 `https://canvas.best/canvas`。本地部署
+`http://localhost:3000` 与在线版不是同一份浏览器存储；使用本地部署时必须先核验
+本地入口和该 Origin 的 `/config`，不能拿在线版的项目 ID 或渠道配置直接补救。
+
+影铸不把配置文件、API Key、WebDAV 密码或浏览器存储复制到项目仓库，也不通过 URL、
+节点 metadata 或提示词传递凭证。若锁定 origin 没有可用渠道，停止媒体生产并提示
+用户先在该 origin 的配置页完成初始化；不得跳到另一个 origin 读取默认空渠道。
 
 ## 状态记录
 
-实时连接确认后，使用状态脚本记录：
+实时连接确认后，使用状态脚本记录实际 origin：
 
 ```powershell
 node <skill-root>/scripts/workflow-state.mjs record-canvas <project-root> `
   --project-id=<projectId> --client-id=<clientId> `
-  --origin=http://localhost:3000 `
+  --origin=<canvas-origin> `
   --route-path=/canvas/<projectId> `
   --title="项目简称｜任务主题｜制作阶段"
 ```
 
-`--origin` 必须是没有路径、查询和片段的 `http://` 或 `https://` origin。后续 Agent
-恢复时必须复用该 origin。没有 `canvas.origin` 的旧状态可以读取，但新连接确认后
-必须补写；不能把旧状态当成允许跨 origin 启动的许可。
+状态里的 `canvas.origin` 是连接审计字段，必须来自当前浏览器页面的实际 origin。
+`projectId`、`routePath` 和 `clientId` 仍然必须来自同一次实时 `canvas_get_state`，
+不能手写或从另一个 origin 复制。
 
-## 渠道保护
+## 失败条件
 
-- 影铸不得读写、清空或重置 Infinite Canvas 的渠道本地存储。
-- 影铸不得把 `http://localhost:3000` 自动替换成 `https://canvas.best`，也不得反向
-  替换。
-- 生成前使用的模型必须从当前 origin 的配置中解析；如果当前页面渠道为空，先按
-  origin 复用/重连并重新查询，不能使用默认渠道顶替。
-- 如果用户明确要求切换 Canvas origin，先在项目状态中记录旧 origin，要求新的 origin
-  由用户明确指定，并在切换后重新核验渠道和 projectId；这不是普通冷启动行为。
+出现以下任一情况时停止 Canvas 写入和媒体生产：
+
+- 当前页面 origin 与本轮已核验的目标 origin 不一致；
+- 实时状态的 `projectId` 与 `/canvas/<projectId>` 不一致；
+- 缺少共享 `clientId`；
+- 配置页显示没有可用渠道或目标能力没有模型；
+- 试图通过切换 origin 或创建新项目来绕过当前 origin 的连接问题。
+
+错误应归类为 `canvas_origin_mismatch`、`route_mismatch`、
+`shared_client_missing` 或 `channel_config_missing`。
+
+如果用户指定的已有画布已被其他 Agent/client 打开，按
+`canvas_occupied` 做用户操作提示，不把它当作普通连接失败：提示用户关闭旧 Agent
+的画布连接或标签页，等待用户确认后重新查询。若用户只是测试、并行处理或没有指定
+必须复用该项目，则可以在同一 origin 使用 `mode=new` 创建独立画布；不得切换新端口、
+关闭未知的旧进程或继续写入被占用的旧项目。
+
+如果只是发现 `clients>0` 或多个标签，不足以判定目标画布被占用。必须同时核对实时
+`projectId`、页面路由和 clientId；当前页面是 `/canvas` 列表页时，属于
+`no_canvas_tab`/`route_mismatch`，不是 `canvas_occupied`。

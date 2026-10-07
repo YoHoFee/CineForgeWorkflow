@@ -24,10 +24,10 @@
 
 | 名称 | 用途 | 依赖级别 |
 | --- | --- | --- |
-| `infinite-canvas:open-canvas` | 冷启动探测无效时启动/复用普通 Canvas Agent 并打开在线或项目指定画布 | 短视频工作流必需 |
+| `infinite-canvas:open-canvas` | 冷启动探测无效时启动/复用普通 Canvas Agent 并打开统一在线画布 | 短视频工作流必需 |
 | `infinite-canvas:canvas` | 读取 Canvas、创建节点、连接参考图、生成和状态查询 | 短视频工作流必需 |
 | `$infinite-canvas-bridge` | 可选的 Infinite Canvas 协同实现层；未加载时由插件工具直接执行 | 非必需别名 |
-| Infinite Canvas Web | 在线或项目指定的画布前端 | 短视频工作流必需 |
+| Infinite Canvas Web | 默认使用 `https://canvas.best`，按本轮实时核验选择 origin；所有同 origin 画布共用渠道配置 | 短视频工作流必需 |
 
 ### 本地运行时
 
@@ -46,6 +46,8 @@ agents/openai.yaml               Codex 界面元数据
 references/                      状态、需求路由、视频提示词交接、片段链、报告和资产模板契约
                                intake-and-routing.md：需求详细程度与动态路由
                                unified-contract.md：跨 Skill 的统一接口和停止条件
+                               problem-guide.md：Canvas 与媒体 API 故障分流及已知案例
+                               canvas-layout-and-chatcut-delivery.md：画布排布、导出映射和 ChatCut 交接
                                video-prompt-handoff.md：第三方视频提示词交接契约
                                video-segment-chain.md：超长视频片段链契约
 references/test-protocol.md     模拟全流程测试契约
