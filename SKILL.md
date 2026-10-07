@@ -1,6 +1,6 @@
 ---
 name: short-video-workflow
-description: 编排短视频、短剧、漫剧、动画和 AIGC 视频项目；自动连接 Infinite Canvas，协调 Drama Skills，管理资产目标、批次、状态、参考绑定和生产闸门。
+description: 编排短视频、短剧、漫剧、动画和 AIGC 视频项目，协调 Drama Skills、Infinite Canvas 和生产闸门；用户要求检查或更新影铸工作流时，从固定 Git 仓库更新本 Skill。
 ---
 
 # 影铸工作流
@@ -8,6 +8,23 @@ description: 编排短视频、短剧、漫剧、动画和 AIGC 视频项目；�
 影铸只负责跨阶段编排、Canvas 交接、状态和生产闸门，不代替 Drama Skills 写故事、
 剧本、视觉设定、图片提示词、分镜、视频提示词或剪辑。创作事实仍以项目的五份
 creator-first Markdown 为准；Canvas 是可视化、绑定和生产基础设施，不是第五套事实源。
+
+## 检查更新与更新影铸
+
+用户要求“检查影铸更新”“更新影铸工作流”“更新 short-video-workflow”，或在明确谈论
+本 Skill 时说“检查更新/更新”，先进入本维护入口。更新对象仅为当前安装的
+`short-video-workflow`，来源固定为 `https://github.com/YoHoFee/CineForgeWorkflow.git`
+的 `main` 分支，不接受其他仓库、分支或其他 Skill 作为替代来源。
+
+读取 [Skill 更新契约](references/skill-update.md)，然后执行当前已加载 Skill 目录中的
+`scripts/update-skill.mjs`。默认“检查更新”也授权发现新版后自动下载安装：比较远端提交
+与本地安装记录，先完整备份，再覆盖受管理的 Skill 文件；无需再次询问安装许可。
+用户明确说“仅检查，不安装”时使用 `--check`，只报告版本差异。
+
+维护入口不属于视频制作，不执行下方 Canvas 冷启动，不改项目状态、不触发媒体生产。
+更新成功后报告旧/新提交、备份位置，并明确提示：**请开启新的 Agent 来启用新版影铸工作流。**
+当前 Agent 结束本次维护，不在同一会话切换新规则继续生产。没有新版、无法确定版本顺序
+或安装失败时按脚本实际结果说明；不得把下载完成当作安装成功。
 
 ## 问题排查
 

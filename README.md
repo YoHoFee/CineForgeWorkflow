@@ -58,7 +58,20 @@ scripts/workflow-state.mjs       状态初始化与校验脚本
 Skill 当前仍以 `$short-video-workflow` 的名称被发现和调用；仓库名称为
 `CineForgeWorkflow`，中文名称为“影铸工作流”。
 
-## 本地校验
+## 检查或更新影铸工作流
+
+在影铸的语境中说“检查更新”或“更新影铸工作流”，Agent 会对比当前安装与固定来源
+`https://github.com/YoHoFee/CineForgeWorkflow.git` 的 `main` 分支。有新版时自动备份、
+下载安装；完成后提示开启新的 Agent 来启用。明确说“仅检查，不安装”则只报告差异。
+更新仅覆盖本 Skill 的受管理安装文件。来源、版本比较和恢复规则见
+[更新契约](references/skill-update.md)。
+
+```powershell
+node <installed-skill-root>/scripts/update-skill.mjs
+node <installed-skill-root>/scripts/update-skill.mjs --check
+```
+
+## 本地状态校验
 
 ```powershell
 node scripts/workflow-state.mjs init <project-root>

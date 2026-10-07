@@ -1,6 +1,6 @@
 interface:
   display_name: "影铸工作流"
-  short_description: "统一编排 Drama Skills 与 Infinite Canvas 的短视频生产流程"
-  default_prompt: "使用 $short-video-workflow；启动时自动连接或复用 Infinite Canvas，再按项目事实完成短视频流程并遵守统一状态、Canvas 交接和生产确认契约。"
+  short_description: "编排短视频生产，并从固定 Git 仓库检查和更新影铸工作流"
+  default_prompt: "使用 $short-video-workflow；检查或更新影铸时先从固定 Git 仓库维护本 Skill；视频制作时自动连接或复用 Infinite Canvas，再按项目事实和生产确认契约执行。"
 policy:
   allow_implicit_invocation: true
